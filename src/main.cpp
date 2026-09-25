@@ -85,20 +85,25 @@ void run_emu() {
             int c = launcher_ingame_menu();
             switch(c) {
                 case 0: break;  // resume
-                case 1:  // save
-                    save_ram();
-                    tft.fillRect(80,80,160,40,TFT_BLACK);
-                    tft.setTextDatum(MC_DATUM); tft.setTextColor(TFT_GREEN);
-                    tft.drawString("SAVED!",SCREEN_W/2,100,4);
+                case 1: { // save state
+                    bool ok = emu_save_state(cur_path);
+                    if (ok) save_ram();
+                    tft.fillRect(30,80,SCREEN_W-60,40,TFT_BLACK);
+                    tft.drawRoundRect(30,80,SCREEN_W-60,40,4, ok ? 0x07E0 : 0xF800);
+                    tft.setTextDatum(MC_DATUM); tft.setTextColor(ok ? 0x07E0 : 0xF800);
+                    tft.drawString(ok ? "STATE SAVED!" : "SAVE FAILED!",SCREEN_W/2,100,2);
                     delay(700);
                     break;
-                case 2:  // load
-                    load_ram(); emu_reset(); load_ram();
-                    tft.fillRect(80,80,160,40,TFT_BLACK);
-                    tft.setTextDatum(MC_DATUM); tft.setTextColor(0x07FF);
-                    tft.drawString("LOADED!",SCREEN_W/2,100,4);
+                }
+                case 2: { // load state
+                    bool ok = emu_load_state(cur_path);
+                    tft.fillRect(30,80,SCREEN_W-60,40,TFT_BLACK);
+                    tft.drawRoundRect(30,80,SCREEN_W-60,40,4, ok ? 0x07FF : 0xF800);
+                    tft.setTextDatum(MC_DATUM); tft.setTextColor(ok ? 0x07FF : 0xF800);
+                    tft.drawString(ok ? "STATE LOADED!" : "NO SAVE STATE!",SCREEN_W/2,100,2);
                     delay(700);
                     break;
+                }
                 case 3:  // quit
                     emu_on=false; save_ram(); return;
                 case 5:  // settings

@@ -1,6 +1,7 @@
 #include "emulator_bridge.h"
 #include "display.h"
 #include "hw_config.h"
+#include "sd_manager.h"
 #include <Arduino.h>
 #include <string.h>
 #include <SD.h>
@@ -260,3 +261,145 @@ uint8_t emu_get_frame_skip(){return fskip;}
 uint32_t emu_get_fps(){return cfps;}
 uint16_t* emu_get_line_buffer(){return lbuf;}
 void emu_reset(){gb_reset(gb);fcnt=0;}
+
+struct SaveStateHeader {
+    char     magic[8];
+    uint32_t version;
+    uint32_t struct_sz;
+    uint32_t cram_sz;
+    uint8_t  palette_idx;
+    uint8_t  reserved[7];
+};
+
+bool emu_save_state(const char* rom_path) {
+    if (!gb || !rom_path || !rom_path[0]) return false;
+    char path[96];
+    sd_get_state_path(rom_path, path, sizeof(path));
+    if (SD.exists(path)) SD.remove(path);
+    File f = SD.open(path, FILE_WRITE);
+    if (!f) {
+        Serial.printf("[STATE] Save open failed: %s\n", path);
+        return false;
+    }
+
+    SaveStateHeader hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    memcpy(hdr.magic, "CYDGBS1", 8);
+    hdr.version = 1;
+    hdr.struct_sz = sizeof(struct gb_s);
+    hdr.cram_sz = (cram && cram_sz > 0) ? cram_sz : 0;
+    hdr.palette_idx = curpal;
+
+    if (f.write((const uint8_t*)&hdr, sizeof(hdr)) != sizeof(hdr)) {
+        f.close();
+        return false;
+    }
+
+    if (f.write((const uint8_t*)gb, sizeof(struct gb_s)) != sizeof(struct gb_s)) {
+        f.close();
+        return false;
+    }
+
+    if (hdr.cram_sz > 0 && cram) {
+        if (f.write(cram, hdr.cram_sz) != hdr.cram_sz) {
+            f.close();
+            return false;
+        }
+    }
+
+    f.close();
+    Serial.printf("[STATE] State saved: %s (size: %u + %u)\n", path, (unsigned)sizeof(struct gb_s), (unsigned)hdr.cram_sz);
+    return true;
+}
+
+bool emu_load_state(const char* rom_path) {
+    if (!gb || !rom_path || !rom_path[0]) return false;
+    char path[96];
+    sd_get_state_path(rom_path, path, sizeof(path));
+    if (!SD.exists(path)) {
+        Serial.printf("[STATE] File not found: %s\n", path);
+        return false;
+    }
+
+    File f = SD.open(path, FILE_READ);
+    if (!f) {
+        Serial.printf("[STATE] Load open failed: %s\n", path);
+        return false;
+    }
+
+    SaveStateHeader hdr;
+    if (f.read((uint8_t*)&hdr, sizeof(hdr)) != sizeof(hdr)) {
+        f.close();
+        return false;
+    }
+
+    if (memcmp(hdr.magic, "CYDGBS1", 8) != 0 || hdr.version != 1) {
+        Serial.println("[STATE] Magic or version mismatch");
+        f.close();
+        return false;
+    }
+
+    if (hdr.struct_sz != sizeof(struct gb_s)) {
+        Serial.printf("[STATE] Struct size mismatch: %u != %u\n", hdr.struct_sz, (unsigned)sizeof(struct gb_s));
+        f.close();
+        return false;
+    }
+
+    uint8_t (*rom_r)(struct gb_s*, const uint_fast32_t) = gb->gb_rom_read;
+    uint8_t (*cram_r)(struct gb_s*, const uint_fast32_t) = gb->gb_cart_ram_read;
+    void (*cram_w)(struct gb_s*, const uint_fast32_t, const uint8_t) = gb->gb_cart_ram_write;
+    void (*err)(struct gb_s*, const enum gb_error_e, const uint16_t) = gb->gb_error;
+    void (*ser_tx)(struct gb_s*, const uint8_t) = gb->gb_serial_tx;
+    enum gb_serial_rx_ret_e (*ser_rx)(struct gb_s*, uint8_t*) = gb->gb_serial_rx;
+    uint8_t (*boot_r)(struct gb_s*, const uint_fast16_t) = gb->gb_bootrom_read;
+    void (*lcd_line_fn)(struct gb_s*, const uint8_t*, const uint_fast8_t) = gb->display.lcd_draw_line;
+    void* priv = gb->direct.priv;
+
+    if (f.read((uint8_t*)gb, sizeof(struct gb_s)) != sizeof(struct gb_s)) {
+        Serial.println("[STATE] Failed reading struct gb_s");
+        f.close();
+        return false;
+    }
+
+    gb->gb_rom_read = rom_r;
+    gb->gb_cart_ram_read = cram_r;
+    gb->gb_cart_ram_write = cram_w;
+    gb->gb_error = err;
+    gb->gb_serial_tx = ser_tx;
+    gb->gb_serial_rx = ser_rx;
+    gb->gb_bootrom_read = boot_r;
+    gb->display.lcd_draw_line = lcd_line_fn;
+    gb->direct.priv = priv;
+
+    if (hdr.cram_sz > 0) {
+        if (cram && cram_sz >= hdr.cram_sz) {
+            if (f.read(cram, hdr.cram_sz) != hdr.cram_sz) {
+                Serial.println("[STATE] Failed reading cart RAM");
+                f.close();
+                return false;
+            }
+        } else {
+            f.seek(f.position() + hdr.cram_sz);
+        }
+    }
+
+    f.close();
+
+    if (hdr.palette_idx < NUM_PALETTES) {
+        curpal = hdr.palette_idx;
+    }
+
+    for (int i = 0; i < PG_N; i++) pg[i].v = false;
+    memset(ht, -1, sizeof(ht));
+    fcnt = 0;
+
+    Serial.printf("[STATE] State loaded: %s\n", path);
+    return true;
+}
+
+bool emu_has_save_state(const char* rom_path) {
+    if (!rom_path || !rom_path[0]) return false;
+    char path[96];
+    sd_get_state_path(rom_path, path, sizeof(path));
+    return SD.exists(path);
+}

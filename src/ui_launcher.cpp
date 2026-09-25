@@ -226,7 +226,7 @@ int launcher_ingame_menu() {
 
 	#define MI 5
 	int yp[MI]={58,88,118,148,178};
-	const char* lb[MI]={"Resume","Save Game","Load Save","Settings","Quit"};
+	const char* lb[MI]={"Resume","Save State","Load State","Settings","Quit"};
 	uint16_t fc[MI]={TFT_GREEN,0x07FF,0x07FF,0xFFE0,TFT_RED};
 	for(int i=0;i<MI;i++) mbtn(btn_x,btn_w,yp[i],lb[i],fc[i],false);
 	wait_release();

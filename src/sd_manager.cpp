@@ -55,6 +55,13 @@ void sd_get_save_path(const char* rp, char* sp, int mx) {
     snprintf(sp,mx,"%s/%s.sav",SAVE_PATH,base);
 }
 
+void sd_get_state_path(const char* rp, char* sp, int mx) {
+    const char* fn=strrchr(rp,'/'); if(!fn)fn=rp; else fn++;
+    char base[MAX_FILENAME]; strncpy(base,fn,MAX_FILENAME-1); base[MAX_FILENAME-1]=0;
+    char* dot=strrchr(base,'.'); if(dot)*dot=0;
+    snprintf(sp,mx,"%s/%s.state",SAVE_PATH,base);
+}
+
 bool sd_save_state(const char* rp, const uint8_t* data, uint32_t sz) {
     if(!ready||!data||!sz) return false;
     char sp[96]; sd_get_save_path(rp,sp,96);

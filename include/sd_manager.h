@@ -30,3 +30,4 @@ bool sd_load_state(const char* rom_path, uint8_t* sram, uint32_t size);
 
 // Save file path helper
 void sd_get_save_path(const char* rom_path, char* save_path, int max_len);
+void sd_get_state_path(const char* rom_path, char* state_path, int max_len);
