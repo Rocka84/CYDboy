@@ -11,39 +11,10 @@
 static RomEntry roms[64];
 static int rcnt = 0;
 static char cur_path[80] = {0};
-static TaskHandle_t ttask = nullptr;
 static volatile bool emu_on = false, menu_req = false;
 static bool show_fps_overlay = false;
 static bool show_sd_save_overlay = false;
 static bool has_saved_settings = false;
-
-void input_task(void* p) {
-    (void)p;
-    bool prev_menu_combo = false;
-    for(;;) {
-        button_update();
-        if (emu_on) {
-            uint16_t b = button_get_buttons();
-            bool menu_combo = ((b & (GB_BTN_START | GB_BTN_SELECT)) == (GB_BTN_START | GB_BTN_SELECT)) || (b & GB_BTN_MENU);
-            if (menu_combo && !prev_menu_combo) {
-                menu_req = true;
-            }
-            prev_menu_combo = menu_combo;
-            if (menu_combo) {
-                emu_set_joypad(b & ~(GB_BTN_START | GB_BTN_SELECT | GB_BTN_MENU));
-            } else {
-                emu_set_joypad(b & 0xFF);
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(12));
-    }
-}
-
-static void tt_start() {
-    if(!ttask) xTaskCreatePinnedToCore(input_task,"t",4096,0,2,&ttask,0);
-    else vTaskResume(ttask);
-}
-static void tt_stop() { if(ttask) vTaskSuspend(ttask); }
 
 static void save_ram() {
     if(!cur_path[0]) return;
@@ -78,17 +49,28 @@ static void load_ram() {
 // ─── Emulation loop ─────────────────────────────────────────────────────────
 void run_emu() {
     emu_on = true; menu_req = false;
-    tt_start();
+    bool prev_menu_combo = false;
     display_clear(TFT_BLACK);
     display_draw_controls();
 
     while(emu_on) {
+        button_update();
+        uint16_t b = button_get_buttons();
+        bool menu_combo = ((b & (GB_BTN_START | GB_BTN_SELECT)) == (GB_BTN_START | GB_BTN_SELECT)) || (b & GB_BTN_MENU);
+        if (menu_combo && !prev_menu_combo) {
+            menu_req = true;
+        }
+        prev_menu_combo = menu_combo;
+        if (menu_combo) {
+            emu_set_joypad(b & ~(GB_BTN_START | GB_BTN_SELECT | GB_BTN_MENU));
+        } else {
+            emu_set_joypad(b & 0xFF);
+        }
+
         emu_run_frame();
 
         if (menu_req) {
             menu_req = false;
-            tt_stop();
-
             int c = launcher_ingame_menu();
             switch(c) {
                 case 0: break;  // resume
@@ -107,13 +89,12 @@ void run_emu() {
                     delay(700);
                     break;
                 case 3:  // quit
-                    emu_on=false; save_ram(); tt_stop(); return;
+                    emu_on=false; save_ram(); return;
                 case 5:  // settings
                     launcher_settings_menu(&show_fps_overlay, &show_sd_save_overlay); break;
             }
             display_clear(TFT_BLACK);
             display_draw_controls();
-            tt_start();
         }
 
         taskYIELD();
@@ -202,7 +183,7 @@ void loop() {
     }
 
     load_ram();
-    if (!has_saved_settings) emu_set_frame_skip(2);
+    if (!has_saved_settings) emu_set_frame_skip(1);
     if (LED_G_PIN >= 0) digitalWrite(LED_G_PIN, LOW);
     run_emu();
     if (LED_G_PIN >= 0) digitalWrite(LED_G_PIN, HIGH);

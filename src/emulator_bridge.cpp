@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include <string.h>
 #include <SD.h>
-#include <SPIFFS.h>
 
 #define ENABLE_LCD 1
 #define ENABLE_SOUND 0
@@ -13,7 +12,7 @@
 
 // ─── Page cache ─────────────────────────────────────────────────────────────
 #define PG_SZ 4096
-#define PG_N  8
+#define PG_N  12
 #define PG_MASK (PG_SZ-1)
 #define HASH_SZ 32
 #define HASH_M (HASH_SZ-1)
@@ -26,8 +25,12 @@ static int npg = 0;
 static File romf;
 static uint32_t romlen = 0;
 
-#define B0SZ (16*1024)
+#define B0SZ (32*1024)
 static uint8_t* b0 = nullptr;
+
+static uint32_t cmiss = 0;
+static uint32_t emu_time_us = 0;
+static uint32_t render_time_us = 0;
 
 static inline uint8_t* IRAM_ATTR cget(uint32_t a) {
     uint32_t pb = a & ~PG_MASK;
@@ -39,6 +42,7 @@ static inline uint8_t* IRAM_ATTR cget(uint32_t a) {
     int lru=0; uint32_t old=UINT32_MAX;
     for (int j=0;j<npg;j++) { if (!pg[j].v){lru=j;break;} if(pg[j].acc<old){old=pg[j].acc;lru=j;} }
     if (pg[lru].v) { int8_t oh=(pg[lru].addr>>12)&HASH_M; if(ht[oh]==lru) ht[oh]=-1; }
+    cmiss++;
     romf.seek(pb); size_t r=romf.read(pg[lru].d, min((uint32_t)PG_SZ,romlen-pb));
     if (r<PG_SZ) memset(pg[lru].d+r,0xFF,PG_SZ-r);
     pg[lru].addr=pb; pg[lru].acc=++acc; pg[lru].v=true; ht[(pb>>12)&HASH_M]=lru;
@@ -109,47 +113,24 @@ static void gb_err(struct gb_s* g, const enum gb_error_e e, const uint16_t a) {
 static void IRAM_ATTR lcd_line(struct gb_s* g, const uint8_t px[160], const uint_fast8_t ln) {
     (void)g;
     if (fskip>0 && (fcnt%(fskip+1))!=0) return;
+    uint32_t t0 = micros();
     const uint16_t* p = pals[curpal];
     for (int x=0;x<GB_SCREEN_W;x++) lbuf[x]=p[px[x]&3];
     display_push_gb_line(ln, lbuf);
-}
-
-// ─── SPIFFS copy ────────────────────────────────────────────────────────────
-static bool cp2spiffs(const char* sp, const char* dp) {
-    File s=SD.open(sp,FILE_READ); if(!s) return false;
-    File d=SPIFFS.open(dp,FILE_WRITE); if(!d){s.close();return false;}
-    uint8_t buf[512]; uint32_t tot=0;
-    while(s.available()){size_t r=s.read(buf,512);d.write(buf,r);tot+=r;
-        if(tot%65536==0) Serial.printf("[SPIFFS] %uKB\n",tot/1024);}
-    d.close();s.close();
-    Serial.printf("[SPIFFS] Done %u bytes\n",tot); return true;
+    render_time_us += (micros() - t0);
 }
 
 // ─── API ────────────────────────────────────────────────────────────────────
 bool emu_open_rom(const char* path) {
-    bool spiffs_ok = SPIFFS.begin(true);
-    if(!spiffs_ok) {
-        Serial.println("[SPIFFS] unavailable, fallback to SD");
+    if (romf) romf.close();
+    romf = SD.open(path, FILE_READ);
+    if (!romf) {
+        Serial.printf("[EMU] Failed to open ROM: %s\n", path);
+        return false;
     }
-    String sn="/rom.gb";
-    if(spiffs_ok && SPIFFS.exists(sn)){
-        File sc=SD.open(path,FILE_READ); uint32_t ssz=sc?sc.size():0; if(sc)sc.close();
-        romf=SPIFFS.open(sn,FILE_READ);
-        if(romf && romf.size()==ssz){romlen=romf.size();Serial.printf("[EMU] SPIFFS %uKB\n",romlen/1024);return true;}
-        if(romf) romf.close();
-    }
-    File sf=SD.open(path,FILE_READ); if(!sf) return false;
-    uint32_t sz=sf.size(); sf.close();
-    if(spiffs_ok && sz<=SPIFFS.totalBytes()-SPIFFS.usedBytes()){
-        Serial.println("[EMU] Copying to SPIFFS...");
-        if(SPIFFS.exists(sn)) SPIFFS.remove(sn);
-        if(cp2spiffs(path,sn.c_str())){
-            romf=SPIFFS.open(sn,FILE_READ);
-            if(romf){romlen=romf.size();return true;}
-        }
-    }
-    romf=SD.open(path,FILE_READ); if(!romf) return false;
-    romlen=romf.size(); return true;
+    romlen = romf.size();
+    Serial.printf("[EMU] SD ROM: %s (%u KB)\n", path, romlen / 1024);
+    return true;
 }
 void emu_close_rom() {
     if (romf) romf.close();
@@ -253,8 +234,19 @@ void emu_run_frame() {
     gb->direct.joypad_bits.select=!(jpad&0x40); gb->direct.joypad_bits.start=!(jpad&0x80);
     gb->direct.joypad_bits.right=!(jpad&0x01); gb->direct.joypad_bits.left=!(jpad&0x02);
     gb->direct.joypad_bits.up=!(jpad&0x04); gb->direct.joypad_bits.down=!(jpad&0x08);
-    gb_run_frame(gb); fcnt++; fpsc++;
-    uint32_t n=millis(); if(n-fpst>=1000){cfps=fpsc;fpsc=0;fpst=n;}
+    uint32_t t0 = micros();
+    gb_run_frame(gb);
+    emu_time_us += (micros() - t0);
+    fcnt++; fpsc++;
+    uint32_t n=millis();
+    if(n-fpst>=1000){
+        cfps=fpsc;
+        uint32_t e_avg = fpsc ? (emu_time_us / fpsc) : 0;
+        uint32_t r_avg = fpsc ? (render_time_us / fpsc) : 0;
+        Serial.printf("[PERF] FPS: %u | emu: %u ms | render: %u ms | misses/s: %u | heap: %u\n",
+                      cfps, e_avg / 1000, r_avg / 1000, cmiss, ESP.getFreeHeap());
+        fpsc=0; fpst=n; cmiss=0; emu_time_us=0; render_time_us=0;
+    }
 }
 
 void emu_set_joypad(uint8_t b){jpad=b;}

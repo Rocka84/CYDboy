@@ -123,7 +123,7 @@ bool touch_load_settings(uint8_t* palette, uint8_t* fskip, uint8_t* brightness,
     bool has = prefs.isKey("pal");
     if (has) {
         *palette = prefs.getUChar("pal", 0);
-        *fskip = prefs.getUChar("fskip", 0);
+        *fskip = prefs.getUChar("fskip", 1);
         *brightness = prefs.getUChar("bright", 255);
         if (show_fps) *show_fps = prefs.getBool("ov_fps", false);
         if (show_save_overlay) *show_save_overlay = prefs.getBool("ov_save", false);

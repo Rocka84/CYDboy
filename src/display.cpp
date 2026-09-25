@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 TFT_eSPI tft = TFT_eSPI();
-static uint16_t scaled[SCREEN_W];
+static uint16_t scaled[SCREEN_W * 2];
 
 void display_init() {
     pinMode(TFT_PIN_BL, OUTPUT);
@@ -28,21 +28,24 @@ void display_clear(uint16_t color) { tft.fillScreen(color); }
 // Game scanline -> top 192px (2x horiz, ~1.33x vert)
 void display_push_gb_line(uint8_t y, uint16_t* buf) {
     if (y >= GB_SCREEN_H) return;
-    // Scale 160 -> SCREEN_W (240) horizontally. We approximate 1.5x scaling
-    // by duplicating every even pixel (pattern: 2,1,2,1...) to reach 240.
     int idx = 0;
     for (int x = 0; x < GB_SCREEN_W && idx < SCREEN_W; x++) {
         scaled[idx++] = buf[x];
         if ((x & 1) == 0 && idx < SCREEN_W) scaled[idx++] = buf[x];
     }
     while (idx < SCREEN_W) scaled[idx++] = buf[GB_SCREEN_W-1];
+
     int y0 = y * GAME_H / GB_SCREEN_H;
     int y1 = (y+1) * GAME_H / GB_SCREEN_H;
-    if (y1 == y0) y1 = y0 + 1;
+    if (y1 <= y0) y1 = y0 + 1;
+    int h = y1 - y0;
+    if (y0 + h > GAME_H) h = GAME_H - y0;
+    if (h <= 0) return;
 
-    // No setSwapBytes - palette values are pre-swapped in emulator_bridge
-    for (int sy = y0; sy < y1 && sy < GAME_H; sy++)
-        tft.pushImage(0, sy, SCREEN_W, 1, scaled);
+    if (h == 2) {
+        memcpy(scaled + SCREEN_W, scaled, SCREEN_W * sizeof(uint16_t));
+    }
+    tft.pushImage(0, y0, SCREEN_W, h, scaled);
 }
 
 // ─── Control bar (y=192..240 / 256..320) ───────────────────────────────────
