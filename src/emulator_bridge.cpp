@@ -13,7 +13,7 @@
 
 // ─── Page cache ─────────────────────────────────────────────────────────────
 #define PG_SZ 4096
-#define PG_N  16
+#define PG_N  8
 #define PG_MASK (PG_SZ-1)
 #define HASH_SZ 32
 #define HASH_M (HASH_SZ-1)
@@ -26,7 +26,7 @@ static int npg = 0;
 static File romf;
 static uint32_t romlen = 0;
 
-#define B0SZ (32*1024)
+#define B0SZ (16*1024)
 static uint8_t* b0 = nullptr;
 
 static inline uint8_t* IRAM_ATTR cget(uint32_t a) {
@@ -47,8 +47,8 @@ static inline uint8_t* IRAM_ATTR cget(uint32_t a) {
 
 // ─── State ──────────────────────────────────────────────────────────────────
 static struct gb_s* gb = nullptr;
-#define MAXRAM (32*1024)
 static uint8_t* cram = nullptr;
+static uint32_t cram_sz = 0;
 static uint16_t lbuf[GB_SCREEN_W];
 static uint8_t fskip = 0, fcnt = 0;
 static uint32_t fpsc = 0, fpst = 0, cfps = 0;
@@ -97,11 +97,11 @@ static uint8_t IRAM_ATTR gb_rom_read(struct gb_s* g, const uint_fast32_t a) {
     (void)g; if(a>=romlen) return 0xFF; if(a<B0SZ) return b0[a]; return *cget(a);
 }
 static uint8_t IRAM_ATTR gb_cram_r(struct gb_s* g, const uint_fast32_t a) {
-    (void)g; return (a<MAXRAM)?cram[a]:0xFF;
+    (void)g; return (cram && a<cram_sz)?cram[a]:0xFF;
 }
 static void IRAM_ATTR gb_cram_w(struct gb_s* g, const uint_fast32_t a, const uint8_t v) {
     (void)g;
-    if(a<MAXRAM) cram[a]=v;
+    if(cram && a<cram_sz) cram[a]=v;
 }
 static void gb_err(struct gb_s* g, const enum gb_error_e e, const uint16_t a) {
     (void)g; Serial.printf("[EMU] Err %d @0x%04X\n",(int)e,a);
@@ -151,26 +151,100 @@ bool emu_open_rom(const char* path) {
     romf=SD.open(path,FILE_READ); if(!romf) return false;
     romlen=romf.size(); return true;
 }
-void emu_close_rom(){if(romf)romf.close();romlen=0;}
+void emu_close_rom() {
+    if (romf) romf.close();
+    romlen = 0;
+    for (int i = 0; i < PG_N; i++) {
+        if (pg[i].d) { free(pg[i].d); pg[i].d = nullptr; }
+        pg[i].v = false;
+    }
+    npg = 0;
+    if (b0) { free(b0); b0 = nullptr; }
+    if (cram) { free(cram); cram = nullptr; cram_sz = 0; }
+    if (gb) { free(gb); gb = nullptr; }
+    Serial.printf("[EMU] Closed. Free heap: %u\n", ESP.getFreeHeap());
+}
 
-bool emu_init(uint8_t*,uint32_t) {
-    if(!romf||!romlen) return false;
-    memset(ht,-1,sizeof(ht));
-    npg=0;
-    for(int i=0;i<PG_N;i++){pg[i].v=false;if(!pg[i].d)pg[i].d=(uint8_t*)malloc(PG_SZ);if(!pg[i].d)break;npg++;}
-    Serial.printf("[EMU] %d pages\n",npg);
-    if(!b0) b0=(uint8_t*)malloc(B0SZ); if(!b0) return false;
-    romf.seek(0); romf.read(b0,min(romlen,(uint32_t)B0SZ));
-    if(!cram) cram=(uint8_t*)malloc(MAXRAM); if(!cram) return false;
-    memset(cram,0xFF,MAXRAM);
-    if(!gb) gb=(struct gb_s*)malloc(sizeof(struct gb_s)); if(!gb) return false;
-    memset(gb,0,sizeof(struct gb_s));
-    enum gb_init_error_e r=gb_init(gb,gb_rom_read,gb_cram_r,gb_cram_w,gb_err,nullptr);
-    if(r!=GB_INIT_NO_ERROR){Serial.printf("[EMU] init fail %d\n",(int)r);return false;}
-    gb_init_lcd(gb,lcd_line);
-    fcnt=fpsc=cfps=0; fpst=millis(); acc=0;
-    char t[17]={0}; for(int i=0;i<16;i++){char c=(char)b0[0x134+i];t[i]=(c>=32&&c<127)?c:0;}
-    Serial.printf("[EMU] '%s' %uKB heap:%u\n",t,romlen/1024,ESP.getFreeHeap());
+bool emu_init(uint8_t*, uint32_t) {
+    if (!romf || !romlen) {
+        Serial.println("[EMU] Init failed: no ROM open");
+        return false;
+    }
+
+    Serial.printf("[EMU] Init: free heap=%u, max alloc=%u\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+
+    if (!gb) gb = (struct gb_s*)malloc(sizeof(struct gb_s));
+    if (!gb) {
+        Serial.printf("[EMU] Failed to alloc gb (%u bytes)\n", sizeof(struct gb_s));
+        return false;
+    }
+    memset(gb, 0, sizeof(struct gb_s));
+
+    if (!b0) b0 = (uint8_t*)malloc(B0SZ);
+    if (!b0) {
+        Serial.printf("[EMU] Failed to alloc b0 (%u bytes)\n", B0SZ);
+        return false;
+    }
+    romf.seek(0);
+    romf.read(b0, min(romlen, (uint32_t)B0SZ));
+
+    uint32_t req_ram = 0;
+    if (b0[0x0147] == 0x05 || b0[0x0147] == 0x06) {
+        req_ram = 512;
+    } else {
+        uint8_t rc = b0[0x0149];
+        if (rc == 1) req_ram = 2048;
+        else if (rc == 2) req_ram = 8192;
+        else if (rc >= 3) req_ram = 32768;
+    }
+
+    if (req_ram > 0) {
+        if (!cram || cram_sz != req_ram) {
+            if (cram) free(cram);
+            cram = (uint8_t*)malloc(req_ram);
+        }
+        if (!cram) {
+            Serial.printf("[EMU] Failed to alloc cram (%u bytes)\n", req_ram);
+            return false;
+        }
+        cram_sz = req_ram;
+        memset(cram, 0xFF, cram_sz);
+    } else {
+        if (cram) { free(cram); cram = nullptr; }
+        cram_sz = 0;
+    }
+
+    enum gb_init_error_e r = gb_init(gb, gb_rom_read, gb_cram_r, gb_cram_w, gb_err, nullptr);
+    if (r != GB_INIT_NO_ERROR) {
+        Serial.printf("[EMU] gb_init failed: %d\n", (int)r);
+        return false;
+    }
+    gb_init_lcd(gb, lcd_line);
+
+    memset(ht, -1, sizeof(ht));
+    npg = 0;
+    for (int i = 0; i < PG_N; i++) {
+        pg[i].v = false;
+        if (!pg[i].d) pg[i].d = (uint8_t*)malloc(PG_SZ);
+        if (!pg[i].d) break;
+        npg++;
+    }
+    Serial.printf("[EMU] %d pages allocated. RAM: %u. Free heap: %u\n", npg, cram_sz, ESP.getFreeHeap());
+
+    if (npg < 4) {
+        Serial.printf("[EMU] Not enough pages (<4)\n");
+        return false;
+    }
+
+    fcnt = fpsc = cfps = 0;
+    fpst = millis();
+    acc = 0;
+    char t[17] = {0};
+    for (int i = 0; i < 16; i++) {
+        char c = (char)b0[0x134 + i];
+        t[i] = (c >= 32 && c < 127) ? c : 0;
+    }
+    Serial.printf("[EMU] '%s' %uKB heap:%u\n", t, romlen / 1024, ESP.getFreeHeap());
     return true;
 }
 
@@ -184,8 +258,8 @@ void emu_run_frame() {
 }
 
 void emu_set_joypad(uint8_t b){jpad=b;}
-uint8_t* emu_get_cart_ram(uint32_t* s){uint_fast32_t r=0;gb_get_save_size_s(gb,&r);if(s)*s=(uint32_t)r;return cram;}
-void emu_set_cart_ram(const uint8_t* d,uint32_t s){if(s>MAXRAM)s=MAXRAM;memcpy(cram,d,s);}
+uint8_t* emu_get_cart_ram(uint32_t* s){if(s)*s=cram_sz;return cram;}
+void emu_set_cart_ram(const uint8_t* d,uint32_t s){if(cram&&d&&s>0){if(s>cram_sz)s=cram_sz;memcpy(cram,d,s);}}
 bool emu_cart_ram_dirty(){return false;}
 uint32_t emu_get_cart_ram_last_write_ms(){return 0;}
 void emu_clear_cart_ram_dirty(){}

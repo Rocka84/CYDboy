@@ -58,16 +58,16 @@ static void draw_list(RomEntry* r, int cnt, int pg, int sel) {
 			tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
 			tft.drawString(sz,SCREEN_W-12,y+ITEM_H/2-2,1);
 		} else {
-			// Virtual app entry: BT scanner
+			// Virtual app entry: Bluetooth Gamepad
 			tft.fillRoundRect(ITEM_X+3,y+5,26,18,3,0x07FF);
 			tft.setTextColor(TFT_BLACK,0x07FF); tft.setTextDatum(MC_DATUM);
 			tft.drawString("BT",ITEM_X+16,y+14,1);
 
 			tft.setTextColor(fg,bg); tft.setTextDatum(ML_DATUM);
-			tft.drawString("Beacon Scanner",ITEM_X+34,y+ITEM_H/2-2,2);
+			tft.drawString("Bluetooth Gamepad",ITEM_X+34,y+ITEM_H/2-2,2);
 
-		tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
-		tft.drawString("APP",SCREEN_W-12,y+ITEM_H/2-2,1);
+			tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
+			tft.drawString("SETUP",SCREEN_W-12,y+ITEM_H/2-2,1);
 		}
 	}
 
@@ -96,6 +96,36 @@ int launcher_show(RomEntry* roms, int cnt) {
 	while (true) {
 		button_update();
 		uint16_t b = button_get_buttons();
+
+		if (touch_is_pressed()) {
+			int16_t tx = touch_get_x(), ty = touch_get_y();
+			if (ty >= ITEM_Y0 && ty < ITEM_Y0 + ITEMS_PP * ITEM_H) {
+				int idx = pg * ITEMS_PP + (ty - ITEM_Y0) / ITEM_H;
+				if (idx < total) {
+					if (sel != idx) {
+						sel = idx;
+						draw_list(roms, cnt, pg, sel);
+						delay(180);
+					} else {
+						if (sel == cnt) return LAUNCHER_SEL_BT_SCANNER;
+						return sel;
+					}
+				}
+			}
+			if (ty >= SCREEN_H - 24) {
+				if (tx < 70 && pg > 0) {
+					pg--; sel = pg * ITEMS_PP; draw_list(roms, cnt, pg, sel); delay(250);
+				} else if (tx > SCREEN_W - 60) {
+					touch_run_calibration();
+					draw_header("Game Boy ROMs");
+					draw_list(roms, cnt, pg, sel);
+					delay(250);
+				} else if (tx > 70 && tx < SCREEN_W - 60 && pg < tp - 1) {
+					pg++; sel = pg * ITEMS_PP; draw_list(roms, cnt, pg, sel); delay(250);
+				}
+			}
+		}
+
 		// Up
 		if ((b & GB_BTN_UP) && !(prev & GB_BTN_UP)) {
 			if (sel > 0) sel--; else if (pg>0) { pg--; sel = min(total-1, pg*ITEMS_PP+ITEMS_PP-1); }
@@ -161,6 +191,30 @@ int launcher_ingame_menu() {
 	while(true) {
 		button_update();
 		uint16_t b = button_get_buttons();
+
+		if (touch_is_pressed()) {
+			int16_t tx = touch_get_x(), ty = touch_get_y();
+			if (tx >= btn_x && tx <= btn_x + btn_w) {
+				for (int i = 0; i < MI; i++) {
+					if (ty >= yp[i] && ty < yp[i] + 26) {
+						if (hl != i) {
+							mbtn(btn_x, btn_w, yp[hl], lb[hl], fc[hl], false);
+							hl = i;
+							mbtn(btn_x, btn_w, yp[hl], lb[hl], fc[hl], true);
+						}
+						delay(200);
+						switch(hl) {
+							case 0: return 0;
+							case 1: return 1;
+							case 2: return 2;
+							case 3: return 5;
+							case 4: return 3;
+						}
+					}
+				}
+			}
+		}
+
 		if ((b & GB_BTN_UP) && !(prev & GB_BTN_UP)) {
 			mbtn(btn_x,btn_w,yp[hl],lb[hl],fc[hl],false);
 			hl = (hl==0)?MI-1:hl-1;
@@ -253,6 +307,34 @@ void launcher_settings_menu(bool* show_fps_overlay, bool* show_save_overlay) {
 	while(true) {
 		button_update();
 		uint16_t b = button_get_buttons();
+
+		if (touch_is_pressed()) {
+			int16_t tx = touch_get_x(), ty = touch_get_y();
+			if (ty >= 65 && ty < 93) {
+				if (tx < 120) { pal = (pal+NUM_PALETTES-1)%NUM_PALETTES; }
+				else { pal = (pal+1)%NUM_PALETTES; }
+				emu_set_palette(pal);
+				draw_settings(0);
+				delay(200);
+			} else if (ty >= 120 && ty < 148) {
+				if (tx < 120 && fs > 0) fs--;
+				else if (tx >= 120 && fs < 4) fs++;
+				emu_set_frame_skip(fs);
+				draw_settings(1);
+				delay(200);
+			} else if (ty >= 175 && ty < 203) {
+				if (tx < 120 && bl > 30) bl -= 25;
+				else if (tx >= 120 && bl < 255) bl = min(255, bl + 25);
+				display_set_backlight(bl);
+				draw_settings(2);
+				delay(200);
+			} else if (ty >= 295) {
+				touch_save_settings(pal, fs, bl, false, false);
+				wait_release();
+				return;
+			}
+		}
+
 		// Navigation: up/down change selected row (edge detect)
 		if ((b & GB_BTN_UP) && !(prev & GB_BTN_UP)) { sel = (sel==0)?3:sel-1; draw_settings(sel); }
 		if ((b & GB_BTN_DOWN) && !(prev & GB_BTN_DOWN)) { sel = (sel+1)%4; draw_settings(sel); }

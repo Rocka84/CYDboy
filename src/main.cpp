@@ -6,7 +6,7 @@
 #include "sd_manager.h"
 #include "ui_launcher.h"
 #include "emulator_bridge.h"
-#include "bt_scanner.h"
+#include "bt_controller.h"
 
 static RomEntry roms[64];
 static int rcnt = 0;
@@ -24,13 +24,13 @@ void input_task(void* p) {
         button_update();
         if (emu_on) {
             uint16_t b = button_get_buttons();
-            bool menu_combo = (b & (GB_BTN_START | GB_BTN_SELECT)) == (GB_BTN_START | GB_BTN_SELECT);
+            bool menu_combo = ((b & (GB_BTN_START | GB_BTN_SELECT)) == (GB_BTN_START | GB_BTN_SELECT)) || (b & GB_BTN_MENU);
             if (menu_combo && !prev_menu_combo) {
                 menu_req = true;
             }
             prev_menu_combo = menu_combo;
             if (menu_combo) {
-                emu_set_joypad(b & ~(GB_BTN_START | GB_BTN_SELECT));
+                emu_set_joypad(b & ~(GB_BTN_START | GB_BTN_SELECT | GB_BTN_MENU));
             } else {
                 emu_set_joypad(b & 0xFF);
             }
@@ -121,13 +121,7 @@ void run_emu() {
 }
 
 static void run_bt_scanner() {
-    bt_scanner_enter();
-    while (true) {
-        if (bt_scanner_loop()) break;
-        delay(10);
-        taskYIELD();
-    }
-    bt_scanner_shutdown();
+    bt_controller_ui_show();
     display_clear(TFT_BLACK);
 }
 
@@ -145,6 +139,7 @@ void setup() {
     display_init();
     touch_init();
     button_init();
+    bt_controller_init();
 
     if(!sd_init()) {
         tft.fillScreen(TFT_BLACK); tft.setTextDatum(MC_DATUM);
@@ -158,6 +153,12 @@ void setup() {
     tft.setTextColor(0x07E0); tft.drawString("CYD-GB",SCREEN_W/2,70,4);
     tft.setTextColor(0x7BEF); tft.drawString("Game Boy Emulator",SCREEN_W/2,110,2);
     delay(1200);
+
+    // Auto-run calibration on boot if no calibration data is present
+    if (!touch_has_calibration()) {
+        Serial.println("[INIT] No calibration found. Launching calibration...");
+        touch_run_calibration();
+    }
 
     // Load saved settings from NVS
     uint8_t s_pal, s_fs, s_bl;

@@ -26,6 +26,8 @@ int16_t touch_get_y();
 void touch_set_calibration(TouchCalibration cal);
 TouchCalibration touch_get_default_calibration();
 void touch_run_calibration();
+bool touch_has_calibration();
+void touch_clear_calibration();
 
 // Settings persistence (NVS)
 void touch_save_settings(uint8_t palette, uint8_t fskip, uint8_t brightness,

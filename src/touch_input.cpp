@@ -42,21 +42,21 @@ static bool read_raw(int16_t* rx, int16_t* ry, int16_t* rz) {
     digitalWrite(T_CS, LOW);
     uint16_t z1 = spi16(CMD_Z1), z2 = spi16(CMD_Z2);
     int16_t z = z1 - z2 + 4095;
-    if (z < 200) { digitalWrite(T_CS, HIGH); *rz = 0; return false; }
+    if (z < 100) { digitalWrite(T_CS, HIGH); *rz = 0; return false; }
     uint32_t sx = 0, sy = 0; int n = 0;
-    for (int i = 0; i < 6; i++) {  // 6 samples for better accuracy
+    for (int i = 0; i < 4; i++) {
         uint16_t x = spi16(CMD_X), y = spi16(CMD_Y);
-        if (x > 100 && x < 4000 && y > 100 && y < 4000) { sx += x; sy += y; n++; }
+        if (x > 50 && x < 4050 && y > 50 && y < 4050) { sx += x; sy += y; n++; }
     }
     digitalWrite(T_CS, HIGH);
-    if (n < 2) { *rz = 0; return false; }  // need at least 2 good samples
+    if (n < 1) { *rz = 0; return false; }
     *rx = sx / n; *ry = sy / n; *rz = z;
     return true;
 }
 
 // ─── NVS Save/Load ──────────────────────────────────────────────────────────
 static void save_cal_to_nvs() {
-    prefs.begin("touch", false);
+    prefs.begin("touch_v2", false);
     prefs.putShort("xmin", cal.x_min);
     prefs.putShort("xmax", cal.x_max);
     prefs.putShort("ymin", cal.y_min);
@@ -70,7 +70,7 @@ static void save_cal_to_nvs() {
 }
 
 static bool load_cal_from_nvs() {
-    prefs.begin("touch", true);
+    prefs.begin("touch_v2", true);
     bool valid = prefs.getBool("valid", false);
     if (valid) {
         cal.x_min = prefs.getShort("xmin", 200);
@@ -86,6 +86,23 @@ static bool load_cal_from_nvs() {
     }
     prefs.end();
     return valid;
+}
+
+bool touch_has_calibration() {
+    prefs.begin("touch_v2", true);
+    bool valid = prefs.getBool("valid", false);
+    prefs.end();
+    return valid;
+}
+
+void touch_clear_calibration() {
+    prefs.begin("touch_v2", false);
+    prefs.clear();
+    prefs.end();
+    prefs.begin("touch", false);
+    prefs.clear();
+    prefs.end();
+    Serial.println("[CAL] Calibration cleared");
 }
 
 // ─── Settings NVS ───────────────────────────────────────────────────────────
@@ -212,78 +229,78 @@ void touch_run_calibration() {
     tft.setTextColor(0xAD55);
     tft.drawString("Touch each + carefully", SCREEN_W/2, 46, 2);
 
-    // 5 calibration points: 4 corners + center
+    // 5 calibration points: 4 corners + center (240x320 portrait)
     struct { int16_t sx, sy; } targets[5] = {
-        {22, 80}, {218, 80}, {22, 280}, {218, 280}, {120, 180}
+        {30, 45}, {210, 45}, {30, 275}, {210, 275}, {120, 160}
     };
     const char* labels[5] = {"Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right", "Center"};
     int16_t raw_x[5], raw_y[5];
-    bool got[5] = {false};
 
     for (int i = 0; i < 5; i++) {
-        // Clear instruction area
-        tft.fillRect(0, 42, SCREEN_W, 28, TFT_BLACK);
-        tft.setTextColor(TFT_WHITE);
-        tft.setTextDatum(MC_DATUM);
-        char msg[32]; snprintf(msg, 32, "%d/5: %s", i + 1, labels[i]);
-        tft.drawString(msg, SCREEN_W/2, 70, 2);
-
-        // Draw crosshair with circle
         int tx = targets[i].sx, ty = targets[i].sy;
-        tft.drawCircle(tx, ty, 10, 0x07E0);
+        int info_y = (ty < 100) ? 170 : ((ty > 200) ? 120 : 60);
+
+        tft.fillRect(0, info_y - 18, SCREEN_W, 36, TFT_BLACK);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextDatum(MC_DATUM);
+        char msg[32]; snprintf(msg, sizeof(msg), "%d/5: %s", i + 1, labels[i]);
+        tft.drawString(msg, SCREEN_W / 2, info_y, 2);
+
+        // Draw crosshair with double circle
+        tft.drawCircle(tx, ty, 12, 0x07E0);
         tft.drawCircle(tx, ty, 4, 0x07E0);
-        tft.drawLine(tx - 14, ty, tx + 14, ty, 0x07E0);
-        tft.drawLine(tx, ty - 14, tx, ty + 14, 0x07E0);
+        tft.drawLine(tx - 16, ty, tx + 16, ty, 0x07E0);
+        tft.drawLine(tx, ty - 16, tx, ty + 16, 0x07E0);
 
-        // Wait for touch with timeout
-        uint32_t t0 = millis();
-        while (digitalRead(T_IRQ) == HIGH) {
-            delay(10);
-            if (millis() - t0 > 15000) goto cal_fail;  // 15s timeout
-        }
-        delay(100);  // settle time
-
-        // Take multiple samples and median-filter
-        int16_t samples_x[8], samples_y[8];
-        int ns = 0;
-        for (int s = 0; s < 8; s++) {
-            int16_t rx, ry, rz;
-            if (read_raw(&rx, &ry, &rz)) {
-                samples_x[ns] = rx;
-                samples_y[ns] = ry;
-                ns++;
+        bool got_point = false;
+        while (!got_point) {
+            uint32_t t0 = millis();
+            while (digitalRead(T_IRQ) == HIGH) {
+                delay(10);
+                if (millis() - t0 > 25000) goto cal_fail;
             }
-            delay(30);
-        }
 
-        if (ns >= 3) {
-            // Sort and take median
-            for (int a = 0; a < ns-1; a++) for (int b = a+1; b < ns; b++) {
-                if (samples_x[a] > samples_x[b]) { int16_t t = samples_x[a]; samples_x[a] = samples_x[b]; samples_x[b] = t; }
-                if (samples_y[a] > samples_y[b]) { int16_t t = samples_y[a]; samples_y[a] = samples_y[b]; samples_y[b] = t; }
+            int16_t samples_x[16], samples_y[16];
+            int ns = 0;
+            uint32_t t_sample = millis();
+            while (millis() - t_sample < 500 && ns < 12) {
+                int16_t rx, ry, rz;
+                if (read_raw(&rx, &ry, &rz)) {
+                    samples_x[ns] = rx;
+                    samples_y[ns] = ry;
+                    ns++;
+                }
+                delay(8);
+                if (digitalRead(T_IRQ) == HIGH && ns >= 3) break;
             }
-            raw_x[i] = samples_x[ns / 2];
-            raw_y[i] = samples_y[ns / 2];
-            got[i] = true;
-            Serial.printf("[CAL] %d: raw(%d,%d) -> screen(%d,%d) [%d samples]\n",
-                          i, raw_x[i], raw_y[i], tx, ty, ns);
+
+            if (ns >= 2) {
+                for (int a = 0; a < ns - 1; a++) {
+                    for (int b = a + 1; b < ns; b++) {
+                        if (samples_x[a] > samples_x[b]) { int16_t t = samples_x[a]; samples_x[a] = samples_x[b]; samples_x[b] = t; }
+                        if (samples_y[a] > samples_y[b]) { int16_t t = samples_y[a]; samples_y[a] = samples_y[b]; samples_y[b] = t; }
+                    }
+                }
+                raw_x[i] = samples_x[ns / 2];
+                raw_y[i] = samples_y[ns / 2];
+                got_point = true;
+                Serial.printf("[CAL] %d (%s): raw(%d,%d) -> screen(%d,%d) [%d samples]\n",
+                              i + 1, labels[i], raw_x[i], raw_y[i], tx, ty, ns);
+            }
         }
 
-        // Mark done
-        tft.fillCircle(tx, ty, 8, got[i] ? TFT_GREEN : TFT_RED);
+        // Visual feedback: green dot
+        tft.fillCircle(tx, ty, 8, TFT_GREEN);
 
-        // Wait release
         while (digitalRead(T_IRQ) == LOW) delay(10);
-        delay(300);
+        delay(250);
+
+        // Erase crosshair
+        tft.fillRect(tx - 18, ty - 18, 36, 36, TFT_BLACK);
     }
 
     // ─── Calculate calibration from 5 points ────────────────────────────────
     {
-        // Check we got all points
-        int valid = 0;
-        for (int i = 0; i < 5; i++) if (got[i]) valid++;
-        if (valid < 4) goto cal_fail;
-
         TouchCalibration nc;
 
         // Determine swap: top-left to top-right should change screen X
