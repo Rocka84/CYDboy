@@ -14,6 +14,7 @@ static void onConnectedController(ControllerPtr ctl) {
     String name = ctl->getModelName();
     snprintf(controller_name, sizeof(controller_name), "%s", name.c_str());
     Serial.printf("[BT] Controller connected: %s\n", controller_name);
+    BP32.enableNewBluetoothConnections(false);
 }
 
 static void onDisconnectedController(ControllerPtr ctl) {
@@ -22,6 +23,7 @@ static void onDisconnectedController(ControllerPtr ctl) {
         active_controller = nullptr;
         strncpy(controller_name, "None", sizeof(controller_name));
         bt_buttons = 0;
+        BP32.enableNewBluetoothConnections(true);
     }
 }
 

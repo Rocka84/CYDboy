@@ -5,6 +5,7 @@
 bool emu_open_rom(const char* path);
 void emu_close_rom();
 bool emu_init(uint8_t* rom_data, uint32_t rom_size);
+const char* emu_get_error();
 void emu_run_frame();
 void emu_set_joypad(uint8_t buttons);
 uint8_t* emu_get_cart_ram(uint32_t* size);

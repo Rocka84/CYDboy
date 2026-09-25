@@ -1,21 +1,22 @@
 # 🎮 CYD-GB
 
-**Game Boy emulator for the ESP32 Cheap Yellow Display (ESP32-2432S028R) — featuring touchscreen controls, Bluetooth gamepads, USB Web ROM management, true Save States, and accurate 10:9 display scaling.**
+**Game Boy (DMG) & Game Boy Color (GBC) emulator for the ESP32 Cheap Yellow Display (ESP32-2432S028R) — featuring full CGB color support, touchscreen controls, Bluetooth gamepads, USB Web ROM management, true Save States, and accurate 10:9 display scaling.**
 
-Run Game Boy games smoothly on a stock $15 CYD board without requiring external PSRAM or physical buttons. Just flash, insert a microSD card with your ROMs, and play!
+Run Game Boy and Game Boy Color games smoothly on a stock $15 CYD board without requiring external PSRAM or physical buttons. Just flash, insert a microSD card with your ROMs, and play!
 
 ---
 
 ## ✨ Features
 
-- **No PSRAM Required** — Optimized for stock ESP32-2432S028R (320 KB internal SRAM).
-- **Bluetooth Gamepad Support (Bluepad32)** — Connect Xbox, PlayStation (PS4/PS5), Nintendo Switch Pro, 8BitDo, and generic Bluetooth controllers.
+- **Full Game Boy & Game Boy Color (GBC) Support** — Powered by the Walnut-CGB core: authentic double-speed CPU mode, dual-bank VRAM (16 KB), 8-bank WRAM (32 KB), CGB color palettes, and HDMA/GDMA support.
+- **No PSRAM Required** — Highly optimized memory footprint tailored for stock ESP32 internal SRAM (320 KB total).
+- **High-Performance Direct SD Streaming** — Direct FAT32 cluster table traversal to build contiguous disk extents on ROM open. Uses raw SPI sector reads (`SD.readRAW`) bypassing VFS overhead, backed by a 512-byte hardware-aligned page cache with hash indexing for fluid 50+ FPS gameplay with 0 misses.
+- **Bluetooth Gamepad Support (Bluepad32)** — Connect Xbox, PlayStation (PS4/PS5), Nintendo Switch Pro, 8BitDo, and generic Bluetooth controllers. Auto-pauses background inquiry scanning once connected for ultra-low latency.
 - **Auto-Hiding Touch Controls** — Automatically hides on-screen controls when a Bluetooth controller connects, freeing up the display.
 - **Web Serial ROM Manager** — Upload `.gb` / `.gbc` ROMs and manage files directly over USB via Google Chrome or Edge using `tools/web-installer/index.html` (no need to remove the SD card!).
-- **True Save States** — Full emulator state serialization (CPU, registers, timers, VRAM, WRAM, OAM, I/O, palettes, cart RAM) saved to `/saves/<rom>.state`. Resume instantly from the pause menu without resetting!
-- **Battery Saves (SRAM)** — Automatic `.sav` battery backup for cartridge games (Pokémon, Zelda, etc.).
-- **20 Curated Color Palettes** — Classic Green, Original DMG, Pocket Gray, Warm Sepia, Lava, Neon, Ocean, Forest, Gold, and more.
-- **Direct SD Streaming** — 12-page (48 KB) LRU page cache with bank 0 pinned to RAM; plays large ROMs directly without needing internal SPIFFS copies.
+- **True Save States** — Full emulator state serialization (CPU, registers, timers, VRAM, WRAM, OAM, I/O, palettes, cart RAM) saved to `/saves/<rom>.state`. Supports long filenames (up to 160 characters) and instant resume from the pause menu!
+- **Battery Saves (SRAM)** — Automatic `.sav` battery backup for cartridge games (Pokémon, Zelda, Wario Land, etc.).
+- **20 Curated Color Palettes (DMG Mode)** — Classic Green, Original DMG, Pocket Gray, Warm Sepia, Lava, Neon, Ocean, Forest, Gold, and more for classic monochrome Game Boy titles.
 - **I2C Button Board Support** — Optional PCF8574 I2C button board auto-detection on GPIO 16/17 for DIY handheld shells.
 - **Persistent Settings (NVS)** — Palette, frame skip, backlight brightness, and 5-point touch calibration remembered across reboots.
 
@@ -128,13 +129,13 @@ cyd-gb/
 │   ├── bt_controller.h    # Bluepad32 Bluetooth gamepad driver & input tester
 │   ├── button_input.h     # Combined input manager (Touch, BT, PCF8574 I2C)
 │   ├── display.h          # Display primitives and scanline pusher
-│   ├── emulator_bridge.h  # Peanut-GB emulator interface & save state serialization
+│   ├── emulator_bridge.h  # Emulator bridge, raw sector cache & save state serialization
 │   ├── hw_config.h        # Pin assignments, display geometry, touch coordinates
-│   ├── peanut_gb.h        # Peanut-GB emulator core (MIT license)
 │   ├── sd_manager.h       # SD card mounting, ROM scanner, path helpers
 │   ├── serial_manager.h   # Web Serial protocol handler for USB ROM management
 │   ├── touch_input.h      # XPT2046 touch driver & 5-point calibration
-│   └── ui_launcher.h      # ROM list UI, BT indicator, in-game pause menu
+│   ├── ui_launcher.h      # ROM list UI, BT indicator, in-game pause menu
+│   └── walnut_cgb.h       # Walnut-CGB Game Boy & Game Boy Color emulator core (MIT)
 ├── src/
 │   ├── bt_controller.cpp
 │   ├── button_input.cpp
@@ -156,17 +157,19 @@ cyd-gb/
 
 | Issue | Solution |
 |-------|----------|
-| **SD Card Error on boot** | Verify microSD card is formatted as FAT32 and `/roms/gb` folder exists. |
+| **SD Card Error on boot** | Verify microSD card is formatted as FAT32 and `/roms/gb` & `/roms/gbc` folders exist. |
 | **Touchscreen uncalibrated** | Touch the `[CAL]` button in the launcher nav bar to run the 5-point calibration. Calibration is saved to NVS. |
+| **Bluetooth controller input lag** | Once connected, background inquiry scanning is automatically paused. In the in-game Settings, set **Frame Skip** to `1` or `0` for instantaneous response. |
 | **Bluetooth controller reconnect slow** | Fast interlaced page scan is enabled. Turn on controller before or right at boot; the indicator pill `[BT]` in the top-right header will turn green once connected. |
-| **ROM hack sprites glitched** | The emulator core is DMG (Game Boy Classic). Game Boy Color-only ROMs or hacks relying on GBC VRAM Bank 1 (e.g. *Super Mario Land 2 DX*) require GBC hardware. Use standard `.gb` ROMs with the built-in color palettes. |
+| **GBC ROM hacks / Color palettes** | Both standard Game Boy (`.gb`) and Game Boy Color (`.gbc`) ROMs and color hacks (e.g. *Super Mario Land 2 DX*, *Wario Land II*) are fully supported with authentic hardware palettes. |
 | **USB upload fails (port locked)** | Disconnect any open Web Serial sessions in Google Chrome/Edge before running `pio run -t upload`. |
 
 ---
 
 ## 📜 Credits & License
 
-- **[Peanut-GB](https://github.com/deltabeard/Peanut-GB)** — Lightweight Game Boy emulator core by Mahyar Koshkouei (MIT License).
+- **[Walnut](https://github.com/Gronis/walnut)** — High-performance, portable Game Boy & Game Boy Color emulator core (MIT License).
+- **[Peanut-GB](https://github.com/deltabeard/Peanut-GB)** — Original lightweight DMG emulator core reference by Mahyar Koshkouei (MIT License).
 - **[Bluepad32](https://github.com/ricardoquesada/bluepad32)** — Bluetooth gamepad library by Ricardo Quesada.
 - **[TFT_eSPI](https://github.com/Bodmer/TFT_eSPI)** — High-performance display driver by Bodmer.
 - **[ESP32 Cheap Yellow Display Community](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display)** — Hardware documentation and pinouts.

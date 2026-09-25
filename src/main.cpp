@@ -10,9 +10,9 @@
 #include "serial_manager.h"
 //#include "wifi_upload.h"
 
-static RomEntry roms[64];
+static RomEntry* roms = nullptr;
 static int rcnt = 0;
-static char cur_path[80] = {0};
+static char cur_path[MAX_PATHLEN] = {0};
 static volatile bool emu_on = false, menu_req = false;
 static bool show_fps_overlay = false;
 static bool show_sd_save_overlay = false;
@@ -174,18 +174,26 @@ void setup() {
                       s_pal, s_fs, s_bl, (int)show_fps_overlay, (int)show_sd_save_overlay);
     }
 
-    Serial.printf("[INIT] Heap: %u\n",ESP.getFreeHeap());
+    Serial.printf("[INIT] FreeHeap: %u, MaxAlloc: %u\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
 }
 
 // ─── Loop ───────────────────────────────────────────────────────────────────
 void loop() {
-    rcnt = sd_scan_roms(roms, 64);
+    if (!roms) roms = (RomEntry*)malloc(sizeof(RomEntry) * MAX_ROMS);
+    if (!roms) {
+        Serial.println("[MAIN] Failed to alloc roms list");
+        delay(1000);
+        return;
+    }
+    rcnt = sd_scan_roms(roms, MAX_ROMS);
     int sel = launcher_show(roms, rcnt);
     if (sel == LAUNCHER_SEL_BT_SCANNER) {
+        if (roms) { free(roms); roms = nullptr; }
         run_bt_scanner();
         return;
     }
     if (sel == LAUNCHER_SEL_USB_MANAGER) {
+        if (roms) { free(roms); roms = nullptr; }
         serial_manager_run();
         return;
     }
@@ -193,23 +201,34 @@ void loop() {
     //     wifi_upload_run();
     //     return;
     // }
-    if(sel<0||sel>=rcnt) return;
+    if (sel < 0 || sel >= rcnt) {
+        if (roms) { free(roms); roms = nullptr; }
+        return;
+    }
 
-    strncpy(cur_path,roms[sel].full_path,79);
+    strncpy(cur_path, roms[sel].full_path, 79);
     cur_path[79] = 0;
 
     // Loading screen
     tft.fillScreen(TFT_BLACK); tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(0x07E0); tft.drawString("Loading...",SCREEN_W/2,90,4);
-    char nm[30]; strncpy(nm,roms[sel].filename,28); nm[28]=0;
-    char* d=strrchr(nm,'.'); if(d)*d=0;
-    tft.setTextColor(TFT_WHITE); tft.drawString(nm,SCREEN_W/2,130,2);
+    tft.setTextColor(0x07E0); tft.drawString("Loading...", SCREEN_W/2, 90, 4);
+    char nm[30]; strncpy(nm, roms[sel].filename, 28); nm[28] = 0;
+    char* d = strrchr(nm, '.'); if (d) *d = 0;
+    tft.setTextColor(TFT_WHITE); tft.drawString(nm, SCREEN_W/2, 130, 2);
 
-    if(!emu_open_rom(cur_path)){
+    if (roms) { free(roms); roms = nullptr; }
+
+    if (!emu_open_rom(cur_path)) {
         tft.setTextColor(TFT_RED); tft.drawString("Open failed!",SCREEN_W/2,170,2); delay(2000); return;
     }
     if(!emu_init(0,0)){
-        tft.setTextColor(TFT_RED); tft.drawString("Init failed!",SCREEN_W/2,170,2); delay(2000); emu_close_rom(); return;
+        tft.setTextColor(TFT_RED);
+        char errbuf[64];
+        snprintf(errbuf, sizeof(errbuf), "Init: %s", emu_get_error());
+        tft.drawString(errbuf, SCREEN_W/2, 170, 2);
+        delay(3000);
+        emu_close_rom();
+        return;
     }
 
     load_ram();

@@ -9,7 +9,12 @@ static bool ready = false;
 
 bool sd_init() {
     sdSPI.begin(SD_PIN_SCK, SD_PIN_MISO, SD_PIN_MOSI, SD_PIN_CS);
-    if(!SD.begin(SD_PIN_CS, sdSPI, 20000000)){Serial.println("[SD] Mount fail!");return false;}
+    if(!SD.begin(SD_PIN_CS, sdSPI, 40000000)){
+        if(!SD.begin(SD_PIN_CS, sdSPI, 25000000)){
+            Serial.println("[SD] Mount fail!");
+            return false;
+        }
+    }
 
     Serial.printf("[SD] Type:%d Size:%lluMB\n",SD.cardType(),SD.cardSize()/(1024*1024));
     if(!SD.exists(ROM_PATH_GB)) SD.mkdir(ROM_PATH_GB);
@@ -49,41 +54,59 @@ bool sd_load_rom(const char* p, uint8_t** buf, uint32_t* sz) { return false; /* 
 void sd_free_rom(uint8_t* b) { if(b) free(b); }
 
 void sd_get_save_path(const char* rp, char* sp, int mx) {
-    const char* fn=strrchr(rp,'/'); if(!fn)fn=rp; else fn++;
-    char base[MAX_FILENAME]; strncpy(base,fn,MAX_FILENAME-1); base[MAX_FILENAME-1]=0;
-    char* dot=strrchr(base,'.'); if(dot)*dot=0;
-    snprintf(sp,mx,"%s/%s.sav",SAVE_PATH,base);
+    const char* fn = strrchr(rp, '/');
+    if (!fn) fn = rp; else fn++;
+    char base[MAX_FILENAME];
+    strncpy(base, fn, sizeof(base) - 1);
+    base[sizeof(base) - 1] = 0;
+    char* dot = strrchr(base, '.');
+    if (dot) *dot = 0;
+    int len = strlen(base);
+    while (len > 0 && (base[len - 1] == ' ' || base[len - 1] == '\t')) base[--len] = 0;
+    snprintf(sp, mx, "%s/%s.sav", SAVE_PATH, base);
 }
 
 void sd_get_state_path(const char* rp, char* sp, int mx) {
-    const char* fn=strrchr(rp,'/'); if(!fn)fn=rp; else fn++;
-    char base[MAX_FILENAME]; strncpy(base,fn,MAX_FILENAME-1); base[MAX_FILENAME-1]=0;
-    char* dot=strrchr(base,'.'); if(dot)*dot=0;
-    snprintf(sp,mx,"%s/%s.state",SAVE_PATH,base);
+    const char* fn = strrchr(rp, '/');
+    if (!fn) fn = rp; else fn++;
+    char base[MAX_FILENAME];
+    strncpy(base, fn, sizeof(base) - 1);
+    base[sizeof(base) - 1] = 0;
+    char* dot = strrchr(base, '.');
+    if (dot) *dot = 0;
+    int len = strlen(base);
+    while (len > 0 && (base[len - 1] == ' ' || base[len - 1] == '\t')) base[--len] = 0;
+    snprintf(sp, mx, "%s/%s.state", SAVE_PATH, base);
 }
 
 bool sd_save_state(const char* rp, const uint8_t* data, uint32_t sz) {
-    if(!ready||!data||!sz) return false;
-    char sp[96]; sd_get_save_path(rp,sp,96);
-    if(SD.exists(sp)) SD.remove(sp);
-    File f=SD.open(sp,FILE_WRITE); if(!f) return false;
-    size_t w=f.write(data,sz); f.close();
-    Serial.printf("[SD] Save: %s (%u)\n",sp,w);
-    return w==sz;
+    if (!ready || !data || !sz) return false;
+    char sp[MAX_PATHLEN];
+    sd_get_save_path(rp, sp, sizeof(sp));
+    if (SD.exists(sp)) SD.remove(sp);
+    File f = SD.open(sp, FILE_WRITE);
+    if (!f) return false;
+    size_t w = f.write(data, sz);
+    f.close();
+    Serial.printf("[SD] Save: %s (%u)\n", sp, (unsigned)w);
+    return w == sz;
 }
 
 bool sd_load_state(const char* rp, uint8_t* data, uint32_t sz) {
-    if(!ready||!data||!sz) return false;
-    char sp[96]; sd_get_save_path(rp,sp,96);
-    if(!SD.exists(sp)) {
+    if (!ready || !data || !sz) return false;
+    char sp[MAX_PATHLEN];
+    sd_get_save_path(rp, sp, sizeof(sp));
+    if (!SD.exists(sp)) {
         Serial.printf("[SD] Load miss: %s\n", sp);
         return false;
     }
-    File f=SD.open(sp,FILE_READ); if(!f) return false;
-    size_t r=f.read(data,sz); f.close();
-    Serial.printf("[SD] Load: %s (%u)\n",sp,r);
+    File f = SD.open(sp, FILE_READ);
+    if (!f) return false;
+    size_t r = f.read(data, sz);
+    f.close();
+    Serial.printf("[SD] Load: %s (%u)\n", sp, (unsigned)r);
     if (r != sz) {
-        Serial.printf("[SD] Load size mismatch: expected=%u got=%u\n", sz, (uint32_t)r);
+        Serial.printf("[SD] Load size mismatch: expected=%u got=%u\n", (unsigned)sz, (unsigned)r);
     }
-    return r==sz;
+    return r == sz;
 }

@@ -7,14 +7,15 @@
 #include <stdbool.h>
 
 #define MAX_ROMS        64
-#define MAX_FILENAME    48
+#define MAX_FILENAME    96
+#define MAX_PATHLEN     160
 #define ROM_PATH_GB     "/roms/gb"
 #define ROM_PATH_GBC    "/roms/gbc"
 #define SAVE_PATH       "/saves"
 
 struct RomEntry {
     char     filename[MAX_FILENAME];
-    char     full_path[80];
+    char     full_path[MAX_PATHLEN];
     uint32_t size;
     bool     is_gbc;  // true if from /roms/gbc
 };
