@@ -1,137 +1,174 @@
- # 🎮 CYD-GB
+# 🎮 CYD-GB
 
-**Game Boy emulator for the $15 ESP32 Cheap Yellow Display — fully touchscreen controlled.**
+**Game Boy emulator for the ESP32 Cheap Yellow Display (ESP32-2432S028R) — featuring touchscreen controls, Bluetooth gamepads, USB Web ROM management, true Save States, and accurate 10:9 display scaling.**
 
-The first GB emulator running on ESP32-2432S028R (CYD) without PSRAM and without any physical buttons. Just flash, insert SD card with ROMs, and play with your fingers.
+Run Game Boy games smoothly on a stock $15 CYD board without requiring external PSRAM or physical buttons. Just flash, insert a microSD card with your ROMs, and play!
 
-## Features
+---
 
-- **No extra hardware** — runs on a stock CYD board ($15)
-- **Touchscreen controls** — D-pad, A, B, Start, Select all on-screen
-- **SD card ROM browser** — touch to select and play
-- **20 color palettes** — Classic Green, DMG, Neon, Sepia and more
-- **Save system** — battery saves persist on SD card
-- **Smart calibration** — 5-point touch calibration saved to NVS
-- **Settings persist** — palette, frame skip, brightness remembered across reboots
-- **SPIFFS ROM cache** — copies ROM from SD to flash for faster reads
+## ✨ Features
 
-## Hardware
+- **No PSRAM Required** — Optimized for stock ESP32-2432S028R (320 KB internal SRAM).
+- **Bluetooth Gamepad Support (Bluepad32)** — Connect Xbox, PlayStation (PS4/PS5), Nintendo Switch Pro, 8BitDo, and generic Bluetooth controllers.
+- **Auto-Hiding Touch Controls** — Automatically hides on-screen controls when a Bluetooth controller connects, freeing up the display.
+- **Web Serial ROM Manager** — Upload `.gb` / `.gbc` ROMs and manage files directly over USB via Google Chrome or Edge using `tools/web-installer/index.html` (no need to remove the SD card!).
+- **True Save States** — Full emulator state serialization (CPU, registers, timers, VRAM, WRAM, OAM, I/O, palettes, cart RAM) saved to `/saves/<rom>.state`. Resume instantly from the pause menu without resetting!
+- **Battery Saves (SRAM)** — Automatic `.sav` battery backup for cartridge games (Pokémon, Zelda, etc.).
+- **20 Curated Color Palettes** — Classic Green, Original DMG, Pocket Gray, Warm Sepia, Lava, Neon, Ocean, Forest, Gold, and more.
+- **Direct SD Streaming** — 12-page (48 KB) LRU page cache with bank 0 pinned to RAM; plays large ROMs directly without needing internal SPIFFS copies.
+- **I2C Button Board Support** — Optional PCF8574 I2C button board auto-detection on GPIO 16/17 for DIY handheld shells.
+- **Persistent Settings (NVS)** — Palette, frame skip, backlight brightness, and 5-point touch calibration remembered across reboots.
 
-**Required:** [ESP32-2432S028R](https://makeradvisor.com/tools/cyd-cheap-yellow-display-esp32-2432s028r/) + FAT32 microSD card. That's it.
+---
 
-## Quick Start
+## 🛠️ Hardware Requirements
 
-### 1. Clone or Download
+| Component | Description |
+|-----------|-------------|
+| **Device** | [ESP32-2432S028R](https://makeradvisor.com/tools/cyd-cheap-yellow-display-esp32-2432s028r/) ("Cheap Yellow Display", 2.8" TFT 240×320 resistive touch) |
+| **MicroSD Card** | Formatted as FAT32 (any standard capacity up to 32 GB+) |
+| **Gamepad (Optional)** | Standard Bluetooth gamepad (Xbox One/Series, DualShock 4, DualSense, Switch Pro, 8BitDo, etc.) |
+| **Hardware Buttons (Optional)** | PCF8574 I2C button board connected to SDA (GPIO 16) and SCL (GPIO 17) |
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/artanergin44-collab/cyd-gb.git
 cd cyd-gb
 ```
 
-### 2. File Structure
+### 2. Prepare the MicroSD Card
 
-Make sure your project folder looks exactly like this:
-
-```
-cyd-gb/
-├── platformio.ini
-├── partitions.csv
-├── include/
-│   ├── hw_config.h
-│   ├── display.h
-│   ├── touch_input.h
-│   ├── sd_manager.h
-│   ├── ui_launcher.h
-│   └── emulator_bridge.h
-├── src/
-│   ├── main.cpp
-│   ├── display.cpp
-│   ├── touch_input.cpp
-│   ├── sd_manager.cpp
-│   ├── ui_launcher.cpp
-│   └── emulator_bridge.cpp
-└── lib/            (empty folder)
-```
-
-> **Important:** The `.cpp` files MUST be inside the `src/` folder and `.h` files inside `include/`. PlatformIO will not compile the project if files are in the wrong location. If you downloaded the files flat, create these folders and move the files accordingly.
-
-### 3. Download Peanut-GB
-
-[Peanut-GB](https://github.com/deltabeard/Peanut-GB) is the emulator core (MIT license). It is **not included** in this repo — you must download it:
-
-```bash
-curl -L -o include/peanut_gb.h \
-  "https://raw.githubusercontent.com/deltabeard/Peanut-GB/master/peanut_gb.h"
-```
-
-Or manually download `peanut_gb.h` from [here](https://github.com/deltabeard/Peanut-GB/blob/master/peanut_gb.h) and place it in the `include/` folder.
-
-### 4. Prepare SD Card
-
-Format as FAT32 and create this structure:
+Format your microSD card as **FAT32** and create this folder structure:
 
 ```
 SD Card/
 ├── roms/
-│   ├── gb/     <- put .gb ROM files here
-│   └── gbc/    <- put .gbc ROM files here
-└── saves/      <- created automatically
+│   ├── gb/      <- Place your .gb ROM files here
+│   └── gbc/     <- Place your .gbc ROM files here
+└── saves/       <- Created automatically for .sav and .state files
 ```
 
-### 5. Build and Flash
+### 3. Build & Flash (PlatformIO)
+
+Connect your CYD board via USB:
 
 ```bash
-# First time only: erase flash to initialize SPIFFS partition
-pio run -t erase --upload-port /dev/ttyUSB0
-
-# Build and upload
+# Build and flash firmware
 pio run -t upload --upload-port /dev/ttyUSB0
 
-# Optional: serial monitor
+# (Optional) Open serial monitor
 pio device monitor -b 115200 --port /dev/ttyUSB0
 ```
 
-> On Windows replace `/dev/ttyUSB0` with `COM3` (or your port).
-> On macOS use `/dev/tty.usbserial-*`.
+> **Note:**
+> - On Windows, replace `/dev/ttyUSB0` with your COM port (e.g. `COM3`).
+> - On macOS, use `/dev/tty.usbserial-*` or `/dev/cu.usbserial-*`.
 
-## Controls
+---
 
-| Button | Location |
-|--------|----------|
-| D-Pad | Bottom-left |
-| A / B | Bottom-right |
-| Start / Select | Bottom-center |
-| Pause Menu | Top-right **II** icon |
+## 🌐 Web Serial ROM Manager & Installer
 
-**Pause menu:** Save, Load, Settings, Calibrate, Quit.
+CYD-GB includes a browser-based installer and SD file manager located in [`tools/web-installer/index.html`](tools/web-installer/index.html).
 
-**Settings:** 20 color palettes, frame skip (0-4), brightness control.
+1. Open `tools/web-installer/index.html` in **Google Chrome** or **Microsoft Edge**.
+2. On the CYD launcher screen, select **"USB ROM Manager"**.
+3. In the web interface, click **Connect to CYD** and choose your device's USB serial port.
+4. You can now:
+   - View SD card storage usage (total, used, free space).
+   - Drag & drop `.gb` and `.gbc` ROMs (handles filenames with spaces, chunked uploads, and progress bars).
+   - Delete unwanted ROMs from the SD card.
+   - Flash precompiled firmware binaries directly from the browser.
 
-## How It Works
+---
 
-CYD has no PSRAM (only 320KB RAM), so a 1MB ROM can't fit in memory. CYD-GB solves this with:
+## 🎮 Controls & Gameplay
 
-1. **SPIFFS cache** — ROM copied from SD to internal flash (10x faster reads)
-2. **Page cache** — 16x4KB LRU cache with hash lookup
-3. **Bank 0 pinning** — first 32KB always in RAM
-4. **Bit-bang touch SPI** — custom driver avoids bus conflicts with display and SD card
+### On-Screen Touch Controls
 
-## Troubleshooting
+| Control | Position | Description |
+|---------|----------|-------------|
+| **D-Pad** | Bottom-left | 68×68 cross; directional arrows (supports diagonal inputs) |
+| **A / B** | Bottom-right | A (upper-right, red) and B (lower-left, blue) |
+| **START** | Bottom-center | Start button (`STA`) |
+| **SELECT** | Bottom-center | Select button (`SEL`) |
+| **Pause Menu** | Top-right | Green **`\|\|`** icon opens in-game pause menu |
 
-| Problem | Fix |
-|---------|-----|
-| Black screen | Try `-DILI9341_DRIVER` instead of `-DILI9341_2_DRIVER` in platformio.ini |
-| Touch not working | Use Pause menu -> Calibrate |
-| SPIFFS mount failed | Run `pio run -t erase` then re-flash |
-| Compile error about peanut_gb.h | Download it (see step 3 above) |
-| Files won't compile | Make sure .cpp files are in `src/` and .h files in `include/` |
+### Bluetooth Gamepad Controls
 
-## Credits
+When a Bluetooth gamepad is connected:
+- **D-Pad / Left Stick**: Move
+- **A / B**: A and B action buttons
+- **Start / Select**: Game Boy Start and Select
+- **In-Game Pause Menu**: Press **Start + Select** (either simultaneously or sequentially within 800 ms), or **L1 + R1** / **Menu** button.
+- **On-Screen Touch Controls**: Automatically hidden for a distraction-free display.
 
-- [Peanut-GB](https://github.com/deltabeard/Peanut-GB) — emulator core by Mahyar Koshkouei
-- [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI) — display driver
-- [CYD Community](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display) — hardware docs
+### In-Game Pause Menu
 
-## License
+Pressing the **`\|\|`** button or the gamepad menu combo opens the in-game menu:
+- **Resume** — Return to the active game.
+- **Save State** — Instant full-state snapshot saved to `/saves/<ROM>.state`.
+- **Load State** — Restore the snapshot seamlessly without resetting the game.
+- **Settings** — Choose from 20 color palettes, adjust frame skip (0–4), or change display backlight brightness.
+- **Quit** — Save battery SRAM (`.sav`) and return to the ROM launcher.
 
-MIT. Peanut-GB is also MIT, copyright 2018-2023 Mahyar Koshkouei.
+---
+
+## ⚙️ Project Structure
+
+```
+cyd-gb/
+├── platformio.ini         # PlatformIO environment and library configuration
+├── partitions.csv         # Custom flash partition table
+├── include/
+│   ├── bt_controller.h    # Bluepad32 Bluetooth gamepad driver & input tester
+│   ├── button_input.h     # Combined input manager (Touch, BT, PCF8574 I2C)
+│   ├── display.h          # Display primitives and scanline pusher
+│   ├── emulator_bridge.h  # Peanut-GB emulator interface & save state serialization
+│   ├── hw_config.h        # Pin assignments, display geometry, touch coordinates
+│   ├── peanut_gb.h        # Peanut-GB emulator core (MIT license)
+│   ├── sd_manager.h       # SD card mounting, ROM scanner, path helpers
+│   ├── serial_manager.h   # Web Serial protocol handler for USB ROM management
+│   ├── touch_input.h      # XPT2046 touch driver & 5-point calibration
+│   └── ui_launcher.h      # ROM list UI, BT indicator, in-game pause menu
+├── src/
+│   ├── bt_controller.cpp
+│   ├── button_input.cpp
+│   ├── display.cpp
+│   ├── emulator_bridge.cpp
+│   ├── main.cpp
+│   ├── sd_manager.cpp
+│   ├── serial_manager.cpp
+│   ├── touch_input.cpp
+│   └── ui_launcher.cpp
+└── tools/
+    └── web-installer/
+        └── index.html     # Web Serial flasher & SD ROM file manager
+```
+
+---
+
+## 🔧 Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| **SD Card Error on boot** | Verify microSD card is formatted as FAT32 and `/roms/gb` folder exists. |
+| **Touchscreen uncalibrated** | Touch the `[CAL]` button in the launcher nav bar to run the 5-point calibration. Calibration is saved to NVS. |
+| **Bluetooth controller reconnect slow** | Fast interlaced page scan is enabled. Turn on controller before or right at boot; the indicator pill `[BT]` in the top-right header will turn green once connected. |
+| **ROM hack sprites glitched** | The emulator core is DMG (Game Boy Classic). Game Boy Color-only ROMs or hacks relying on GBC VRAM Bank 1 (e.g. *Super Mario Land 2 DX*) require GBC hardware. Use standard `.gb` ROMs with the built-in color palettes. |
+| **USB upload fails (port locked)** | Disconnect any open Web Serial sessions in Google Chrome/Edge before running `pio run -t upload`. |
+
+---
+
+## 📜 Credits & License
+
+- **[Peanut-GB](https://github.com/deltabeard/Peanut-GB)** — Lightweight Game Boy emulator core by Mahyar Koshkouei (MIT License).
+- **[Bluepad32](https://github.com/ricardoquesada/bluepad32)** — Bluetooth gamepad library by Ricardo Quesada.
+- **[TFT_eSPI](https://github.com/Bodmer/TFT_eSPI)** — High-performance display driver by Bodmer.
+- **[ESP32 Cheap Yellow Display Community](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display)** — Hardware documentation and pinouts.
+
+Licensed under the **MIT License**.
