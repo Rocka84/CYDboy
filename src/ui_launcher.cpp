@@ -4,6 +4,7 @@
 #include "button_input.h"
 #include "emulator_bridge.h"
 #include "serial_manager.h"
+#include "bt_controller.h"
 #include "hw_config.h"
 #include <Arduino.h>
 
@@ -20,12 +21,27 @@ static void wait_release() {
 	delay(100);
 }
 
+static void draw_bt_header_status(bool connected) {
+	tft.fillRect(SCREEN_W-38,0,38,36,0x18C3);
+	if (connected) {
+		tft.fillRoundRect(SCREEN_W-35,9,26,18,3,0x07E0);
+		tft.setTextColor(TFT_BLACK,0x07E0);
+		tft.setTextDatum(MC_DATUM);
+		tft.drawString("BT",SCREEN_W-22,18,1);
+	} else {
+		tft.fillRoundRect(SCREEN_W-35,9,26,18,3,0x2104);
+		tft.drawRoundRect(SCREEN_W-35,9,26,18,3,0x528A);
+		tft.setTextColor(0x7BEF,0x2104);
+		tft.setTextDatum(MC_DATUM);
+		tft.drawString("BT",SCREEN_W-22,18,1);
+	}
+}
+
 static void draw_header(const char* t) {
 	tft.fillRect(0,0,SCREEN_W,36,0x18C3);
 	tft.setTextColor(TFT_WHITE,0x18C3); tft.setTextDatum(ML_DATUM);
 	tft.drawString(t,10,18,2);
-	tft.setTextDatum(MR_DATUM); tft.setTextColor(0x7BEF,0x18C3);
-	tft.drawString("CYD-GB",SCREEN_W-10,18,1);
+	draw_bt_header_status(bt_controller_is_connected());
 }
 
 // ─── ROM List ───────────────────────────────────────────────────────────────
@@ -67,8 +83,9 @@ static void draw_list(RomEntry* r, int cnt, int pg, int sel) {
 			tft.setTextColor(fg,bg); tft.setTextDatum(ML_DATUM);
 			tft.drawString("Bluetooth Gamepad",ITEM_X+34,y+ITEM_H/2-2,2);
 
-			tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
-			tft.drawString("SETUP",SCREEN_W-12,y+ITEM_H/2-2,1);
+			bool bt_conn = bt_controller_is_connected();
+			tft.setTextColor(bt_conn ? 0x07E0 : 0x7BEF, bg); tft.setTextDatum(MR_DATUM);
+			tft.drawString(bt_conn ? "CONNECTED" : "PAIRING", SCREEN_W-12, y+ITEM_H/2-2, 1);
 		} else {
 			// Virtual app entry: USB ROM Manager
 			tft.fillRoundRect(ITEM_X+3,y+5,26,18,3,0xFDE0);
@@ -105,6 +122,7 @@ int launcher_show(RomEntry* roms, int cnt) {
 	uint32_t dbg_t = 0;
 	int total = cnt + 2;
 	int tp = (total+ITEMS_PP-1)/ITEMS_PP;
+	bool last_conn = bt_controller_is_connected();
 	while (true) {
 		if (serial_manager_check_handshake()) {
 			return LAUNCHER_SEL_USB_MANAGER;
@@ -112,6 +130,16 @@ int launcher_show(RomEntry* roms, int cnt) {
 
 		button_update();
 		uint16_t b = button_get_buttons();
+
+		bool curr_conn = bt_controller_is_connected();
+		if (curr_conn != last_conn) {
+			last_conn = curr_conn;
+			draw_bt_header_status(curr_conn);
+			int s = pg * ITEMS_PP, e = min(s + ITEMS_PP, total);
+			if (cnt >= s && cnt < e) {
+				draw_list(roms, cnt, pg, sel);
+			}
+		}
 
 		if (touch_is_pressed()) {
 			int16_t tx = touch_get_x(), ty = touch_get_y();

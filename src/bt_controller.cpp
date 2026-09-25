@@ -29,6 +29,8 @@ void bt_controller_init() {
     Serial.printf("[BT] Initializing Bluepad32 (fw: %s)...\n", BP32.firmwareVersion());
     BP32.setup(&onConnectedController, &onDisconnectedController);
     BP32.enableNewBluetoothConnections(true);
+    gap_set_page_scan_type(PAGE_SCAN_MODE_INTERLACED);
+    gap_set_page_scan_activity(0x0200, 0x0100);
 }
 
 static uint32_t start_latch_until = 0;

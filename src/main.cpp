@@ -146,7 +146,11 @@ void setup() {
     tft.fillScreen(TFT_BLACK); tft.setTextDatum(MC_DATUM);
     tft.setTextColor(0x07E0); tft.drawString("CYD-GB",SCREEN_W/2,70,4);
     tft.setTextColor(0x7BEF); tft.drawString("Game Boy Emulator",SCREEN_W/2,110,2);
-    delay(1200);
+    uint32_t splash_start = millis();
+    while (millis() - splash_start < 1200) {
+        bt_controller_update();
+        delay(20);
+    }
 
     // Auto-run calibration on boot if no calibration data is present
     if (!touch_has_calibration()) {
