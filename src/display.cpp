@@ -48,46 +48,54 @@ void display_push_gb_line(uint8_t y, uint16_t* buf) {
     tft.pushImage(0, y0, SCREEN_W, h, scaled);
 }
 
-// ─── Control bar (y=192..240 / 256..320) ───────────────────────────────────
+// ─── Control bar (y=216..320) ───────────────────────────────────────────────
 void display_draw_controls() {
     tft.fillRect(0, CTRL_Y, SCREEN_W, CTRL_H, 0x18C3);
     tft.drawFastHLine(0, CTRL_Y, SCREEN_W, 0x528A);
 
-    // D-pad
+    // D-pad (68x68, 24px wide arms)
     int cx = DPAD_CX, cy = DPAD_CY;
-    tft.fillRoundRect(cx-8, cy-20, 16, 40, 3, 0x4A69);
-    tft.fillRoundRect(cx-20, cy-8, 40, 16, 3, 0x4A69);
-    tft.fillCircle(cx, cy, 3, 0x2104);
+    tft.fillRoundRect(cx - 12, cy - 34, 24, 68, 4, 0x4A69);
+    tft.fillRoundRect(cx - 34, cy - 12, 68, 24, 4, 0x4A69);
+    tft.fillCircle(cx, cy, 6, 0x2965);
+    tft.drawCircle(cx, cy, 6, 0x2104);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_WHITE, 0x4A69);
-    tft.drawString("^", cx, cy-12, 1);
-    tft.drawString("v", cx, cy+12, 1);
-    tft.drawString("<", cx-12, cy, 1);
-    tft.drawString(">", cx+12, cy, 1);
+    tft.drawString("^", cx, cy - 21, 2);
+    tft.drawString("v", cx, cy + 21, 2);
+    tft.drawString("<", cx - 21, cy, 2);
+    tft.drawString(">", cx + 21, cy, 2);
 
     // A (red, upper-right)
     tft.fillCircle(BTN_A_X, BTN_A_Y, BTN_A_R, 0xC000);
+    tft.drawCircle(BTN_A_X, BTN_A_Y, BTN_A_R, 0xF800);
     tft.setTextColor(TFT_WHITE, 0xC000);
+    tft.setTextDatum(MC_DATUM);
     tft.drawString("A", BTN_A_X, BTN_A_Y, 2);
 
     // B (blue, lower-right)
     tft.fillCircle(BTN_B_X, BTN_B_Y, BTN_B_R, 0x0018);
+    tft.drawCircle(BTN_B_X, BTN_B_Y, BTN_B_R, 0x03FF);
     tft.setTextColor(TFT_WHITE, 0x0018);
+    tft.setTextDatum(MC_DATUM);
     tft.drawString("B", BTN_B_X, BTN_B_Y, 2);
 
     // START
-    tft.fillRoundRect(BTN_ST_X - BTN_ST_W/2, BTN_ST_Y - BTN_ST_H/2, BTN_ST_W, BTN_ST_H, 3, 0x528A);
+    tft.fillRoundRect(BTN_ST_X - BTN_ST_W/2, BTN_ST_Y - BTN_ST_H/2, BTN_ST_W, BTN_ST_H, 4, 0x528A);
     tft.setTextColor(TFT_WHITE, 0x528A);
+    tft.setTextDatum(MC_DATUM);
     tft.drawString("STA", BTN_ST_X, BTN_ST_Y, 1);
 
     // SELECT
-    tft.fillRoundRect(BTN_SE_X - BTN_SE_W/2, BTN_SE_Y - BTN_SE_H/2, BTN_SE_W, BTN_SE_H, 3, 0x528A);
+    tft.fillRoundRect(BTN_SE_X - BTN_SE_W/2, BTN_SE_Y - BTN_SE_H/2, BTN_SE_W, BTN_SE_H, 4, 0x528A);
     tft.setTextColor(TFT_WHITE, 0x528A);
+    tft.setTextDatum(MC_DATUM);
     tft.drawString("SEL", BTN_SE_X, BTN_SE_Y, 1);
 
     // MENU (top-right overlay on game)
     tft.fillCircle(BTN_M_X, BTN_M_Y, BTN_M_R, 0x7BE0);
     tft.setTextColor(TFT_BLACK, 0x7BE0);
+    tft.setTextDatum(MC_DATUM);
     tft.drawString("||", BTN_M_X, BTN_M_Y, 2);
 }
 

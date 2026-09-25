@@ -29,39 +29,38 @@
 #define GB_SCREEN_W 160
 #define GB_SCREEN_H 144
 
-// Game area: top of the screen (keeps same relative area)
-// Previously 192 of 240 (0.8). For portrait (320px tall) use 0.8*320=256
-#define GAME_H 256
-#define CTRL_Y 256
-#define CTRL_H 64
+// Game area: 160x144 scaled 1.5x to 240x216 (exact 10:9 Game Boy aspect ratio)
+#define GAME_H 216
+#define CTRL_Y 216
+#define CTRL_H 104
 
-// ─── Touch Zones (y=192..240 control bar) ───────────────────────────────────
-// D-pad left (mapped for portrait layout)
-#define DPAD_CX    38
-#define DPAD_CY   288
-#define DPAD_R     17
+// ─── Touch Zones (y=216..320 control bar) ───────────────────────────────────
+// D-pad left (larger 68x68 cross with 24px arms)
+#define DPAD_CX    45
+#define DPAD_CY   268
+#define DPAD_R     34
 
-// A = right-upper, B = right-lower (FIXED - was swapped)
+// A = right-upper, B = right-lower (larger radius 20)
 #define BTN_A_X   214
-#define BTN_A_Y   275
-#define BTN_A_R    15
+#define BTN_A_Y   246
+#define BTN_A_R    20
 
-#define BTN_B_X   184
-#define BTN_B_Y   301
-#define BTN_B_R    15
+#define BTN_B_X   174
+#define BTN_B_Y   282
+#define BTN_B_R    20
 
 // Start / Select center
-#define BTN_ST_X  124
-#define BTN_ST_Y  288
-#define BTN_ST_W   29
-#define BTN_ST_H   27
+#define BTN_ST_X  138
+#define BTN_ST_Y  282
+#define BTN_ST_W   32
+#define BTN_ST_H   22
 
-#define BTN_SE_X  86
-#define BTN_SE_Y  288
-#define BTN_SE_W   29
-#define BTN_SE_H   27
+#define BTN_SE_X  102
+#define BTN_SE_Y  282
+#define BTN_SE_W   32
+#define BTN_SE_H   22
 
 // Menu top-right
-#define BTN_M_X   229
+#define BTN_M_X   226
 #define BTN_M_Y    16
-#define BTN_M_R    11
+#define BTN_M_R    12
