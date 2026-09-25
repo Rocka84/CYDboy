@@ -41,7 +41,12 @@ static uint16_t read_pcf_buttons() {
 void button_update() {
     touch_update();
     bt_controller_update();
-    uint16_t btns = touch_get_buttons() | bt_controller_get_buttons();
+    uint16_t bt_btns = bt_controller_get_buttons();
+    uint16_t touch_btns = touch_get_buttons();
+    if (bt_controller_is_connected()) {
+        touch_btns &= GB_BTN_MENU;
+    }
+    uint16_t btns = touch_btns | bt_btns;
     if (pcf_detected) {
         btns |= read_pcf_buttons();
     }

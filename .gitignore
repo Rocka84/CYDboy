@@ -6,3 +6,4 @@
 *.hex
 *.pioenvs/
 .DS_Store
+roms/

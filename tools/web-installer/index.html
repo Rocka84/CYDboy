@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYD-GB Web Flasher &amp; ROM Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --accent: #00e599;
+      --accent-dim: rgba(0, 229, 153, 0.15);
+      --accent-hover: #00ffaa;
+      --danger: #f85149;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --gb-gold: #e3b341;
+      --gb-purple: #a371f7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: rgba(22, 27, 34, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      background: var(--accent);
+      color: #000;
+      font-family: 'Chakra Petch', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      letter-spacing: 1px;
+    }
+
+    .brand h1 {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .chrome-note {
+      font-size: 12px;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    main {
+      flex: 1;
+      max-width: 960px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #04100c;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #21262d;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #30363d;
+      color: #fff;
+    }
+
+    .btn-danger {
+      background: rgba(248, 81, 73, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(248, 81, 73, 0.4);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    /* Terminal & Log */
+    .terminal {
+      background: #090d12;
+      border: 1px solid #1f242c;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      height: 240px;
+      overflow-y: auto;
+      color: #c9d1d9;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .terminal .success { color: var(--accent); }
+    .terminal .error { color: var(--danger); }
+    .terminal .info { color: var(--gb-gold); }
+
+    /* Progress bar */
+    .progress-bar-container {
+      width: 100%;
+      height: 12px;
+      background: #21262d;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 14px 0 8px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #58a6ff);
+      width: 0%;
+      transition: width 0.15s ease;
+    }
+
+    /* Drag & Drop */
+    .drop-zone {
+      border: 2px dashed #30363d;
+      border-radius: 8px;
+      padding: 36px 20px;
+      text-align: center;
+      background: rgba(13, 17, 23, 0.5);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .drop-zone h3 {
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+
+    .drop-zone p {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* ROM list table */
+    .rom-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+    }
+
+    .rom-table th, .rom-table td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+
+    .rom-table th {
+      color: var(--text-dim);
+      font-weight: 500;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .rom-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .badge-gb { background: #1f6feb; color: #fff; }
+    .badge-gbc { background: #238636; color: #fff; }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #21262d;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #8b949e;
+    }
+
+    .status-dot.connected {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .actions-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="logo-badge">CYD-GB</span>
+    <h1>Flasher &amp; ROM Manager</h1>
+  </div>
+  <div class="chrome-note">
+    ⚡ Web Serial for Google Chrome
+  </div>
+</header>
+
+<main>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabBtnFlasher" onclick="switchTab('flasher')">
+      ⚙️ Firmware Flasher
+    </button>
+    <button class="tab-btn" id="tabBtnRoms" onclick="switchTab('roms')">
+      🎮 ROM Manager
+    </button>
+  </div>
+
+  <!-- TAB 1: FIRMWARE FLASHER -->
+  <div id="tabFlasher" class="tab-content active">
+    <div class="card">
+      <div class="card-title">
+        <span>Flash CYD-GB Firmware</span>
+        <div class="status-badge" id="flasherStatusBadge">
+          <span class="status-dot" id="flasherDot"></span>
+          <span id="flasherStatusText">Not connected</span>
+        </div>
+      </div>
+      <p style="color: var(--text-dim); font-size: 14px; line-height: 1.5; margin-bottom: 18px;">
+        Flash the latest pre-compiled CYD-GB binary or select a custom firmware file directly from your browser.
+      </p>
+
+      <div class="actions-row" style="margin-bottom: 16px;">
+        <input type="file" id="firmwareFile" accept=".bin" style="display: none;" onchange="handleFileSelect(event)">
+        <button class="btn btn-secondary" onclick="document.getElementById('firmwareFile').click()">
+          📂 Select Local .bin File
+        </button>
+        <span id="selectedFileName" style="font-size: 13px; color: var(--text-dim);">No file selected</span>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn" id="btnProgram" onclick="startFlashing()">
+          ⚡ Connect &amp; Flash
+        </button>
+      </div>
+
+      <div class="progress-bar-container" id="flasherProgressContainer" style="display: none;">
+        <div class="progress-bar-fill" id="flasherProgressBar"></div>
+      </div>
+      <div id="flasherProgressText" style="font-size: 12px; color: var(--text-dim); text-align: right; margin-top: 4px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>Console Log</span>
+        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="clearLog('flasherTerminal')">Clear</button>
+      </div>
+      <div class="terminal" id="flasherTerminal">Ready. Connect your CYD via USB and choose a firmware binary.</div>
+    </div>
+  </div>
+
+  <!-- TAB 2: ROM MANAGER -->
+  <div id="tabRoms" class="tab-content">
+    <div class="card">
+      <div class="card-title">
+        <span>WebSerial Connection</span>
+        <div class="status-badge" id="romStatusBadge">
+          <span class="status-dot" id="romDot"></span>
+          <span id="romStatusText">Disconnected</span>
+        </div>
+      </div>
+      <div class="actions-row">
+        <button class="btn" id="btnConnectSerial" onclick="connectRomSerial()">
+          🔌 Connect CYD-GB
+        </button>
+        <button class="btn btn-secondary" id="btnDisconnectSerial" style="display: none;" onclick="disconnectRomSerial()">
+          Disconnect
+        </button>
+        <button class="btn btn-secondary" id="btnRefreshRoms" style="display: none;" onclick="requestRomList()">
+          🔄 Refresh ROMs
+        </button>
+      </div>
+    </div>
+
+    <div id="romManagerBody" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>Upload Game Boy ROMs (.gb / .gbc)</span>
+        </div>
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('romFileInput').click()">
+          <input type="file" id="romFileInput" accept=".gb,.gbc" multiple style="display: none;" onchange="handleRomUploadFiles(event)">
+          <h3>Drag &amp; Drop ROMs Here</h3>
+          <p>or click to browse (.gb and .gbc supported)</p>
+        </div>
+
+        <div class="progress-bar-container" id="romProgressContainer" style="display: none;">
+          <div class="progress-bar-fill" id="romProgressBar"></div>
+        </div>
+        <div id="romProgressText" style="font-size: 12px; color: var(--text-dim); text-align: right; margin-top: 4px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>Installed ROMs on SD Card</span>
+          <span id="sdSpaceInfo" style="font-size: 13px; color: var(--accent);"></span>
+        </div>
+        <table class="rom-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Filename</th>
+              <th>Size</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="romTableBody">
+            <tr><td colspan="4" style="color: var(--text-dim); text-align: center;">No ROMs found</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>Serial Log</span>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="clearLog('romTerminal')">Clear</button>
+        </div>
+        <div class="terminal" id="romTerminal">Waiting for connection...</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Load esptool-js bundle for Chrome WebSerial flashing -->
+<script src="https://unpkg.com/esptool-js@0.4.3/bundle.js"></script>
+
+<script>
+  // ─── Tab Switching ────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    if (tab === 'flasher') {
+      document.getElementById('tabBtnFlasher').classList.add('active');
+      document.getElementById('tabFlasher').classList.add('active');
+    } else {
+      document.getElementById('tabBtnRoms').classList.add('active');
+      document.getElementById('tabRoms').classList.add('active');
+    }
+  }
+
+  function clearLog(id) {
+    document.getElementById(id).innerHTML = '';
+  }
+
+  function appendLog(id, msg, type = '') {
+    const el = document.getElementById(id);
+    const line = document.createElement('div');
+    if (type) line.className = type;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // ─── TAB 1: ESPTOOL-JS FLASHER ───────────────────────────────────────────
+  let selectedFileBinary = null;
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('selectedFileName').textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      selectedFileBinary = evt.target.result;
+      appendLog('flasherTerminal', `Loaded local firmware file: ${file.name}`, 'info');
+    };
+    reader.readAsBinaryString(file);
+  }
+
+  async function startFlashing() {
+    if (!navigator.serial) {
+      alert('Web Serial is only supported in Google Chrome and Chromium browsers.');
+      return;
+    }
+    if (!selectedFileBinary) {
+      alert('Please select a .bin firmware file first.');
+      return;
+    }
+
+    try {
+      appendLog('flasherTerminal', 'Requesting USB Serial port...', 'info');
+      const port = await navigator.serial.requestPort();
+      appendLog('flasherTerminal', 'Connecting to ESP32 bootloader...', 'info');
+
+      const esploader = new window.esptooljs.ESPLoader({
+        port: port,
+        baudrate: 921600,
+        terminal: {
+          clean() {},
+          writeLine(data) { appendLog('flasherTerminal', data); },
+          write(data) { appendLog('flasherTerminal', data); }
+        }
+      });
+
+      document.getElementById('flasherDot').classList.add('connected');
+      document.getElementById('flasherStatusText').textContent = 'Connecting...';
+
+      await esploader.main();
+      appendLog('flasherTerminal', `Connected to ${esploader.chip.CHIP_NAME}!`, 'success');
+      document.getElementById('flasherStatusText').textContent = `${esploader.chip.CHIP_NAME}`;
+
+      document.getElementById('flasherProgressContainer').style.display = 'block';
+      const fileArray = [{
+        data: selectedFileBinary,
+        address: 0x10000
+      }];
+
+      appendLog('flasherTerminal', 'Flashing firmware to address 0x10000...', 'info');
+      await esploader.writeFlash({
+        fileArray: fileArray,
+        flashSize: 'keep',
+        eraseAll: false,
+        compress: true,
+        reportProgress: (fileIndex, written, total) => {
+          const pct = Math.round((written / total) * 100);
+          document.getElementById('flasherProgressBar').style.width = pct + '%';
+          document.getElementById('flasherProgressText').textContent = `${pct}% (${(written/1024).toFixed(0)} / ${(total/1024).toFixed(0)} KB)`;
+        }
+      });
+
+      appendLog('flasherTerminal', 'Flashing complete! Resetting ESP32...', 'success');
+      await esploader.after();
+      await port.close();
+
+      document.getElementById('flasherStatusText').textContent = 'Done!';
+      document.getElementById('flasherDot').classList.remove('connected');
+      alert('Firmware flashed successfully! Your CYD-GB is rebooting.');
+    } catch (err) {
+      appendLog('flasherTerminal', 'Error: ' + err.message, 'error');
+      document.getElementById('flasherStatusText').textContent = 'Error';
+      document.getElementById('flasherDot').classList.remove('connected');
+    }
+  }
+
+  // ─── TAB 2: ROM MANAGER (WEBSERIAL) ───────────────────────────────────────
+  let romPort = null;
+  let romReader = null;
+  let romWriter = null;
+  let romReadLoopActive = false;
+  let responseResolver = null;
+  let incomingLineBuffer = '';
+
+  function waitForCondition(predicate, timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        responseResolver = null;
+        reject(new Error('Timeout'));
+      }, timeoutMs);
+
+      responseResolver = (line) => {
+        if (predicate(line)) {
+          clearTimeout(timer);
+          responseResolver = null;
+          resolve(line);
+        }
+      };
+    });
+  }
+
+  async function connectRomSerial() {
+    if (!navigator.serial) {
+      alert('Web Serial is only supported in Google Chrome and Chromium browsers.');
+      return;
+    }
+
+    if (romPort) {
+      await disconnectRomSerial();
+    }
+
+    try {
+      romPort = await navigator.serial.requestPort();
+      await romPort.open({ baudRate: 115200 });
+
+      try {
+        await romPort.setSignals({ dataTerminalReady: false, requestToSend: false });
+      } catch (e) {}
+
+      romWriter = romPort.writable.getWriter();
+      romReadLoopActive = true;
+      incomingLineBuffer = '';
+      startRomReadLoop();
+
+      document.getElementById('romDot').classList.add('connected');
+      document.getElementById('romStatusText').textContent = 'Connecting...';
+      appendLog('romTerminal', 'Port opened. Searching for CYD-GB...', 'info');
+
+      // Handshake retry loop (waits up to 7 seconds, handles reboot/splash screen delay)
+      let connected = false;
+      const handshakeStart = Date.now();
+
+      while (Date.now() - handshakeStart < 7000) {
+        try {
+          await sendRawString('CYD:PING\n');
+          const resp = await waitForCondition((line) => line.startsWith('CYD:PONG'), 600);
+          if (resp) {
+            connected = true;
+            break;
+          }
+        } catch (e) {
+          // Retry
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
+
+      if (!connected) {
+        throw new Error('No reply from CYD-GB. Tip: Make sure the device is on the launcher screen or select "USB ROM Manager" on the CYD screen.');
+      }
+
+      document.getElementById('romStatusText').textContent = 'Connected';
+      document.getElementById('btnConnectSerial').style.display = 'none';
+      document.getElementById('btnDisconnectSerial').style.display = 'inline-flex';
+      document.getElementById('btnRefreshRoms').style.display = 'inline-flex';
+      document.getElementById('romManagerBody').style.display = 'block';
+
+      appendLog('romTerminal', 'CYD-GB Connected successfully!', 'success');
+      await requestSdInfo();
+      await requestRomList();
+    } catch (err) {
+      appendLog('romTerminal', 'Connection failed: ' + err.message, 'error');
+      await disconnectRomSerial();
+    }
+  }
+
+  async function disconnectRomSerial() {
+    romReadLoopActive = false;
+    responseResolver = null;
+    try {
+      if (romWriter) {
+        try {
+          await sendRawString('CYD:EXIT\n');
+        } catch (e) {}
+        romWriter.releaseLock();
+      }
+      if (romReader) await romReader.cancel();
+      if (romPort) await romPort.close();
+    } catch (e) {}
+
+    romPort = null;
+    romWriter = null;
+    romReader = null;
+
+    document.getElementById('romDot').classList.remove('connected');
+    document.getElementById('romStatusText').textContent = 'Disconnected';
+    document.getElementById('btnConnectSerial').style.display = 'inline-flex';
+    document.getElementById('btnDisconnectSerial').style.display = 'none';
+    document.getElementById('btnRefreshRoms').style.display = 'none';
+    document.getElementById('romManagerBody').style.display = 'none';
+    appendLog('romTerminal', 'Disconnected.', 'info');
+  }
+
+  async function startRomReadLoop() {
+    const decoder = new TextDecoderStream();
+    const readableStreamClosed = romPort.readable.pipeTo(decoder.writable);
+    romReader = decoder.readable.getReader();
+
+    try {
+      while (romReadLoopActive) {
+        const { value, done } = await romReader.read();
+        if (done) break;
+        if (value) {
+          handleIncomingText(value);
+        }
+      }
+    } catch (e) {
+      if (romReadLoopActive) appendLog('romTerminal', 'Read error: ' + e.message, 'error');
+    }
+  }
+
+  function handleIncomingText(chunk) {
+    incomingLineBuffer += chunk;
+    const lines = incomingLineBuffer.split('\n');
+    incomingLineBuffer = lines.pop();
+
+    for (let rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      appendLog('romTerminal', '<- ' + line);
+
+      if (line.startsWith('CYD:INFO:')) {
+        try {
+          const info = JSON.parse(line.substring(9));
+          const freeMb = (info.free / (1024*1024)).toFixed(0);
+          const totalMb = (info.total / (1024*1024)).toFixed(0);
+          document.getElementById('sdSpaceInfo').textContent = `SD: ${freeMb} MB free / ${totalMb} MB total`;
+        } catch(e) {}
+      } else if (line.startsWith('CYD:LIST:')) {
+        try {
+          const list = JSON.parse(line.substring(9));
+          renderRomTable(list);
+        } catch (e) {
+          appendLog('romTerminal', 'Error parsing ROM list: ' + e.message, 'error');
+        }
+      }
+
+      if (responseResolver) {
+        responseResolver(line);
+      }
+    }
+  }
+
+  function sendRawString(str) {
+    const encoder = new TextEncoder();
+    return romWriter.write(encoder.encode(str));
+  }
+
+  function sendSerialCommand(cmd, expectPrefix = 'CYD:', timeoutMs = 6000) {
+    appendLog('romTerminal', '-> ' + cmd);
+    return sendRawString(cmd + '\n').then(() => {
+      return waitForCondition((line) => line.startsWith(expectPrefix) || line.startsWith('CYD:ERR'), timeoutMs);
+    });
+  }
+
+  async function requestSdInfo() {
+    await sendSerialCommand('CYD:INFO', 'CYD:INFO:');
+  }
+
+  async function requestRomList() {
+    appendLog('romTerminal', 'Fetching ROM list...', 'info');
+    await sendSerialCommand('CYD:LIST', 'CYD:LIST:');
+  }
+
+  function renderRomTable(roms) {
+    const tbody = document.getElementById('romTableBody');
+    tbody.innerHTML = '';
+
+    if (!roms || roms.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-dim); text-align: center;">No ROMs found on SD card</td></tr>';
+      return;
+    }
+
+    roms.sort((a,b) => a.name.localeCompare(b.name));
+
+    for (let r of roms) {
+      const tr = document.createElement('tr');
+      const badgeClass = r.is_gbc ? 'badge-gbc' : 'badge-gb';
+      const badgeText = r.is_gbc ? 'GBC' : 'GB';
+      const sizeKb = (r.size / 1024).toFixed(1) + ' KB';
+
+      const tdBadge = document.createElement('td');
+      tdBadge.innerHTML = `<span class="rom-badge ${badgeClass}">${badgeText}</span>`;
+
+      const tdName = document.createElement('td');
+      tdName.style.fontWeight = '500';
+      tdName.textContent = r.name;
+
+      const tdSize = document.createElement('td');
+      tdSize.style.color = 'var(--text-dim)';
+      tdSize.style.fontFamily = 'monospace';
+      tdSize.textContent = sizeKb;
+
+      const tdAction = document.createElement('td');
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-danger';
+      delBtn.style.padding = '4px 10px';
+      delBtn.style.fontSize = '12px';
+      delBtn.textContent = 'Delete';
+      delBtn.onclick = () => deleteRom(r.path, r.name);
+      tdAction.appendChild(delBtn);
+
+      tr.appendChild(tdBadge);
+      tr.appendChild(tdName);
+      tr.appendChild(tdSize);
+      tr.appendChild(tdAction);
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  async function deleteRom(path, name) {
+    if (!confirm(`Delete "${name}" from SD card?`)) return;
+    try {
+      appendLog('romTerminal', `Deleting "${path}"...`, 'info');
+      const res = await sendSerialCommand(`CYD:DEL ${path}`);
+      if (res.includes('OK')) {
+        appendLog('romTerminal', `Deleted "${name}"`, 'success');
+        await requestRomList();
+        await requestSdInfo();
+      } else {
+        alert('Failed to delete: ' + res);
+      }
+    } catch (e) {
+      alert('Error: ' + e.message);
+    }
+  }
+
+  // ─── Drag & Drop Upload ───────────────────────────────────────────────────
+  const dropZone = document.getElementById('dropZone');
+  ['dragenter', 'dragover'].forEach(name => {
+    dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  });
+  ['dragleave', 'drop'].forEach(name => {
+    dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+  });
+  dropZone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files;
+    if (files.length > 0) uploadRomFiles(files);
+  });
+
+  function handleRomUploadFiles(e) {
+    if (e.target.files.length > 0) uploadRomFiles(e.target.files);
+  }
+
+  async function uploadRomFiles(files) {
+    if (!romPort || !romWriter) {
+      alert('Please connect to CYD-GB first.');
+      return;
+    }
+
+    const pContainer = document.getElementById('romProgressContainer');
+    const pBar = document.getElementById('romProgressBar');
+    const pText = document.getElementById('romProgressText');
+    pContainer.style.display = 'block';
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const isGbc = file.name.toLowerCase().endsWith('.gbc');
+      const targetDir = isGbc ? '/roms/gbc' : '/roms/gb';
+      const targetPath = `${targetDir}/${file.name}`;
+
+      appendLog('romTerminal', `Starting upload: "${file.name}" (${file.size} bytes) -> ${targetPath}`, 'info');
+
+      try {
+        const putCmd = `CYD:PUT ${targetPath} ${file.size}`;
+        const readyResp = await sendSerialCommand(putCmd, 'CYD:READY', 8000);
+        if (!readyResp.includes('READY')) {
+          throw new Error('Device not ready: ' + readyResp);
+        }
+
+        const buffer = await file.arrayBuffer();
+        const data = new Uint8Array(buffer);
+        const chunkSize = 512;
+        let sent = 0;
+
+        while (sent < data.length) {
+          const end = Math.min(sent + chunkSize, data.length);
+          const chunk = data.subarray(sent, end);
+          await romWriter.write(chunk);
+          sent += chunk.length;
+
+          const pct = Math.round((sent / data.length) * 100);
+          pBar.style.width = pct + '%';
+          pText.textContent = `[${i+1}/${files.length}] ${file.name}: ${pct}% (${(sent/1024).toFixed(0)} / ${(data.length/1024).toFixed(0)} KB)`;
+          await new Promise(r => setTimeout(r, 6));
+        }
+
+        // Wait for device confirmation
+        appendLog('romTerminal', 'Waiting for SD card flush & confirmation...', 'info');
+        const confirm = await waitForCondition((line) => line.includes('CYD:OK') || line.includes('CYD:ERR'), 12000);
+
+        if (confirm.includes('OK')) {
+          appendLog('romTerminal', `Successfully uploaded "${file.name}"!`, 'success');
+        } else {
+          throw new Error('Device returned: ' + confirm);
+        }
+      } catch (err) {
+        appendLog('romTerminal', `Upload failed for "${file.name}": ` + err.message, 'error');
+        alert(`Upload error on ${file.name}: ` + err.message);
+      }
+    }
+
+    pText.textContent = 'Upload complete!';
+    await requestRomList();
+    await requestSdInfo();
+  }
+</script>
+
+</body>
+</html>

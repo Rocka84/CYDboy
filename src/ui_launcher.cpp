@@ -3,6 +3,7 @@
 #include "touch_input.h"
 #include "button_input.h"
 #include "emulator_bridge.h"
+#include "serial_manager.h"
 #include "hw_config.h"
 #include <Arduino.h>
 
@@ -29,7 +30,7 @@ static void draw_header(const char* t) {
 
 // ─── ROM List ───────────────────────────────────────────────────────────────
 static void draw_list(RomEntry* r, int cnt, int pg, int sel) {
-	int total = cnt + 1; // extra entry: BT scanner
+	int total = cnt + 2; // extra entries: BT scanner, USB ROM Manager
 	int s = pg*ITEMS_PP, e = min(s+ITEMS_PP, total);
 	tft.fillRect(0,38,SCREEN_W,202,TFT_BLACK);
 
@@ -57,7 +58,7 @@ static void draw_list(RomEntry* r, int cnt, int pg, int sel) {
 			char sz[12]; snprintf(sz,12,"%uK",r[i].size/1024);
 			tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
 			tft.drawString(sz,SCREEN_W-12,y+ITEM_H/2-2,1);
-		} else {
+		} else if (i == cnt) {
 			// Virtual app entry: Bluetooth Gamepad
 			tft.fillRoundRect(ITEM_X+3,y+5,26,18,3,0x07FF);
 			tft.setTextColor(TFT_BLACK,0x07FF); tft.setTextDatum(MC_DATUM);
@@ -68,6 +69,17 @@ static void draw_list(RomEntry* r, int cnt, int pg, int sel) {
 
 			tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
 			tft.drawString("SETUP",SCREEN_W-12,y+ITEM_H/2-2,1);
+		} else {
+			// Virtual app entry: USB ROM Manager
+			tft.fillRoundRect(ITEM_X+3,y+5,26,18,3,0xFDE0);
+			tft.setTextColor(TFT_BLACK,0xFDE0); tft.setTextDatum(MC_DATUM);
+			tft.drawString("USB",ITEM_X+16,y+14,1);
+
+			tft.setTextColor(fg,bg); tft.setTextDatum(ML_DATUM);
+			tft.drawString("USB ROM Manager",ITEM_X+34,y+ITEM_H/2-2,2);
+
+			tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
+			tft.drawString("SYNC",SCREEN_W-12,y+ITEM_H/2-2,1);
 		}
 	}
 
@@ -91,9 +103,13 @@ int launcher_show(RomEntry* roms, int cnt) {
 	draw_list(roms,cnt,pg,sel);
 	uint16_t prev = 0;
 	uint32_t dbg_t = 0;
-	int total = cnt + 1;
+	int total = cnt + 2;
 	int tp = (total+ITEMS_PP-1)/ITEMS_PP;
 	while (true) {
+		if (serial_manager_check_handshake()) {
+			return LAUNCHER_SEL_USB_MANAGER;
+		}
+
 		button_update();
 		uint16_t b = button_get_buttons();
 
@@ -108,6 +124,7 @@ int launcher_show(RomEntry* roms, int cnt) {
 						delay(180);
 					} else {
 						if (sel == cnt) return LAUNCHER_SEL_BT_SCANNER;
+						if (sel == cnt + 1) return LAUNCHER_SEL_USB_MANAGER;
 						return sel;
 					}
 				}
@@ -147,6 +164,7 @@ int launcher_show(RomEntry* roms, int cnt) {
 		// A = select
 		if ((b & GB_BTN_A) && !(prev & GB_BTN_A)) {
 			if (sel == cnt) return LAUNCHER_SEL_BT_SCANNER;
+			if (sel == cnt + 1) return LAUNCHER_SEL_USB_MANAGER;
 			return sel;
 		}
 

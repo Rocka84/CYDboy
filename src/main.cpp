@@ -7,6 +7,8 @@
 #include "ui_launcher.h"
 #include "emulator_bridge.h"
 #include "bt_controller.h"
+#include "serial_manager.h"
+//#include "wifi_upload.h"
 
 static RomEntry roms[64];
 static int rcnt = 0;
@@ -51,10 +53,19 @@ void run_emu() {
     emu_on = true; menu_req = false;
     bool prev_menu_combo = false;
     display_clear(TFT_BLACK);
-    display_draw_controls();
+    bool controls_visible = !bt_controller_is_connected();
+    if (controls_visible) display_draw_controls();
+    else display_clear_controls();
 
     while(emu_on) {
         button_update();
+        bool bt_connected = bt_controller_is_connected();
+        if (bt_connected == controls_visible) {
+            controls_visible = !bt_connected;
+            if (controls_visible) display_draw_controls();
+            else display_clear_controls();
+        }
+
         uint16_t b = button_get_buttons();
         bool menu_combo = ((b & (GB_BTN_START | GB_BTN_SELECT)) == (GB_BTN_START | GB_BTN_SELECT)) || (b & GB_BTN_MENU);
         if (menu_combo && !prev_menu_combo) {
@@ -94,7 +105,9 @@ void run_emu() {
                     launcher_settings_menu(&show_fps_overlay, &show_sd_save_overlay); break;
             }
             display_clear(TFT_BLACK);
-            display_draw_controls();
+            controls_visible = !bt_controller_is_connected();
+            if (controls_visible) display_draw_controls();
+            else display_clear_controls();
         }
 
         taskYIELD();
@@ -163,6 +176,14 @@ void loop() {
         run_bt_scanner();
         return;
     }
+    if (sel == LAUNCHER_SEL_USB_MANAGER) {
+        serial_manager_run();
+        return;
+    }
+    // if (sel == LAUNCHER_SEL_WIFI_UPLOAD) {
+    //     wifi_upload_run();
+    //     return;
+    // }
     if(sel<0||sel>=rcnt) return;
 
     strncpy(cur_path,roms[sel].full_path,79);

@@ -91,3 +91,7 @@ void display_draw_controls() {
     tft.drawString("||", BTN_M_X, BTN_M_Y, 2);
 }
 
+void display_clear_controls() {
+    tft.fillRect(0, CTRL_Y, SCREEN_W, CTRL_H, TFT_BLACK);
+}
+
