@@ -29,6 +29,8 @@ Featuring full CGB color emulation (Walnut-CGB), direct FAT32 cluster streaming 
 ## ✨ Features
 
 - **Full Game Boy & Game Boy Color (GBC) Support** — Powered by the Walnut-CGB core: authentic double-speed CPU mode, dual-bank VRAM (16 KB), 8-bank WRAM (32 KB), CGB color palettes, and HDMA/GDMA support.
+- **10-bit PWM Audio & Menu Music (BGM)** — High-resolution 10-bit PWM audio (78.1 kHz carrier) on GPIO 26 via onboard SC8002B amplifier. Real-time 4-channel Game Boy APU chiptune synthesis (`minigb_apu`) with pitch-locked linear interpolation resampling. Includes a background music streamer for `/bgm.wav` in the launcher menu.
+- **Runtime Audio Toggle (Zero CPU Overhead)** — Switch Game Sound directly from the settings menu (`OFF (Max Speed)` / `LOW` / `MED` / `HIGH`). When `OFF`, the 22.2 kHz hardware timer interrupt is stopped, synthesis is skipped (0 ms), and GPIO 26 is set to High-Z `INPUT` mode for 100% silence and maximum CPU performance. 100% savestate compatibility between sound-on and sound-off sessions!
 - **No PSRAM Required** — Highly optimized memory footprint tailored for stock ESP32 internal SRAM (320 KB total).
 - **High-Performance Direct SD Streaming** — Direct FAT32 cluster table traversal to build contiguous disk extents on ROM open. Uses raw SPI sector reads (`SD.readRAW`) bypassing VFS overhead, backed by a 512-byte hardware-aligned page cache with hash indexing for fluid 50+ FPS gameplay with 0 misses.
 - **Bluetooth Gamepad Support (Bluepad32)** — Connect Xbox, PlayStation (PS4/PS5), Nintendo Switch Pro, 8BitDo, and generic Bluetooth controllers. Auto-pauses background inquiry scanning once connected for ultra-low latency.
@@ -38,7 +40,7 @@ Featuring full CGB color emulation (Walnut-CGB), direct FAT32 cluster streaming 
 - **Battery Saves (SRAM)** — Automatic `.sav` battery backup for cartridge games (Pokémon, Zelda, Wario Land, etc.).
 - **20 Curated Color Palettes (DMG Mode)** — Classic Green, Original DMG, Pocket Gray, Warm Sepia, Lava, Neon, Ocean, Forest, Gold, and more for classic monochrome Game Boy titles.
 - **I2C Button Board Support** — Optional PCF8574 I2C button board auto-detection on GPIO 16/17 for DIY handheld shells.
-- **Persistent Settings (NVS)** — Palette, frame skip, backlight brightness, and 5-point touch calibration remembered across reboots.
+- **Persistent Settings (NVS)** — Palette, frame skip, backlight brightness, game sound volume, menu music, and 5-point touch calibration remembered across reboots.
 
 ---
 
@@ -79,7 +81,8 @@ SD Card/
 ├── roms/
 │   ├── gb/      <- Place your .gb ROM files here
 │   └── gbc/     <- Place your .gbc ROM files here
-└── saves/       <- Created automatically for .sav and .state files
+├── saves/       <- Created automatically for .sav and .state files
+└── bgm.wav      <- (Optional) Background music for the launcher menu
 ```
 
 ### 3. Build & Flash (PlatformIO)
@@ -143,7 +146,7 @@ Pressing the **`\|\|`** button or the gamepad menu combo opens the in-game menu:
 - **Resume** — Return to the active game.
 - **Save State** — Instant full-state snapshot saved to `/saves/<ROM>.state`.
 - **Load State** — Restore the snapshot seamlessly without resetting the game.
-- **Settings** — Choose from 20 color palettes, adjust frame skip (0–4), or change display backlight brightness.
+- **Settings** — Choose from 20 color palettes, adjust frame skip (0–4), change display backlight brightness, toggle Game Sound (`OFF (Max Speed)` / `LOW` / `MED` / `HIGH`), and toggle Menu Music (`ENABLED` / `DISABLED`).
 - **Quit** — Save battery SRAM (`.sav`) and return to the ROM launcher.
 
 ---
@@ -155,29 +158,34 @@ cyd-gb/
 ├── platformio.ini         # PlatformIO environment and library configuration
 ├── partitions.csv         # Custom flash partition table
 ├── include/
+│   ├── audio_output.h     # 10-bit PWM audio driver, volume control & ring buffer
+│   ├── bgm_player.h       # Background music streamer for SD WAV playback
 │   ├── bt_controller.h    # Bluepad32 Bluetooth gamepad driver & input tester
 │   ├── button_input.h     # Combined input manager (Touch, BT, PCF8574 I2C)
 │   ├── display.h          # Display primitives and scanline pusher
 │   ├── emulator_bridge.h  # Emulator bridge, raw sector cache & save state serialization
 │   ├── hw_config.h        # Pin assignments, display geometry, touch coordinates
+│   ├── minigb_apu.h       # Game Boy APU 4-channel sound synthesizer
 │   ├── sd_manager.h       # SD card mounting, ROM scanner, path helpers
 │   ├── serial_manager.h   # Web Serial protocol handler for USB ROM management
 │   ├── touch_input.h      # XPT2046 touch driver & 5-point calibration
 │   ├── ui_launcher.h      # ROM list UI, BT indicator, in-game pause menu
 │   └── walnut_cgb.h       # Walnut-CGB Game Boy & Game Boy Color emulator core (MIT)
 ├── src/
+│   ├── audio_output.cpp
+│   ├── bgm_player.cpp
 │   ├── bt_controller.cpp
 │   ├── button_input.cpp
 │   ├── display.cpp
 │   ├── emulator_bridge.cpp
 │   ├── main.cpp
+│   ├── minigb_apu.c
 │   ├── sd_manager.cpp
 │   ├── serial_manager.cpp
 │   ├── touch_input.cpp
 │   └── ui_launcher.cpp
 └── tools/
-    └── web-installer/
-        └── index.html     # Web Serial flasher & SD ROM file manager
+    └── read_serial.py     # USB serial monitor & telemetry inspection tool
 ```
 
 ---
@@ -190,6 +198,7 @@ cyd-gb/
 | **Touchscreen uncalibrated** | Touch the `[CAL]` button in the launcher nav bar to run the 5-point calibration. Calibration is saved to NVS. |
 | **Bluetooth controller input lag** | Once connected, background inquiry scanning is automatically paused. In the in-game Settings, set **Frame Skip** to `1` or `0` for instantaneous response. |
 | **Bluetooth controller reconnect slow** | Fast interlaced page scan is enabled. Turn on controller before or right at boot; the indicator pill `[BT]` in the top-right header will turn green once connected. |
+| **Game audio & speed optimization** | In demanding scenes, switch Game Sound to `OFF (Max Speed)` in Settings to immediately free up CPU time and achieve full 60 FPS speed with 100% savestate compatibility. |
 | **GBC ROM hacks / Color palettes** | Both standard Game Boy (`.gb`) and Game Boy Color (`.gbc`) ROMs and color hacks (e.g. *Super Mario Land 2 DX*, *Wario Land II*) are fully supported with authentic hardware palettes. |
 | **USB upload fails (port locked)** | Disconnect any open Web Serial sessions in Google Chrome/Edge before running `pio run -t upload`. |
 
@@ -199,6 +208,7 @@ cyd-gb/
  
 - **[artanergin44-collab/cyd-gb](https://github.com/artanergin44-collab/cyd-gb)** — Upstream project and foundation for the initial ESP32 Cheap Yellow Display Game Boy port.
 - **[Walnut](https://github.com/Gronis/walnut)** — High-performance, portable Game Boy & Game Boy Color emulator core (MIT License).
+- **[minigb_apu](https://github.com/robmikh/minigb_apu)** — Accurate Game Boy audio processing unit (APU) synthesis by Gilles Mouchard & contributors.
 - **[Peanut-GB](https://github.com/deltabeard/Peanut-GB)** — Original lightweight DMG emulator core reference by Mahyar Koshkouei (MIT License).
 - **[Bluepad32](https://github.com/ricardoquesada/bluepad32)** — Bluetooth gamepad library by Ricardo Quesada.
 - **[TFT_eSPI](https://github.com/Bodmer/TFT_eSPI)** — High-performance display driver by Bodmer.

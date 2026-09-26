@@ -32,13 +32,7 @@ def copy_firmware_with_timestamp(source, target, env):
     docs_bin = docs_dir / "firmware.bin"
     shutil.copy2(firmware_bin, docs_bin)
 
-    # 3. Deploy to tools/web-installer/ for local testing
-    tools_dir = project_dir / "tools" / "web-installer"
-    if tools_dir.exists():
-        tools_bin = tools_dir / "firmware.bin"
-        shutil.copy2(firmware_bin, tools_bin)
-
-    # 4. Write metadata JSON to docs/
+    # 3. Write metadata JSON to docs/
     size_bytes = firmware_bin.stat().st_size
     info = {
         "project": "CYDboy",
@@ -50,6 +44,7 @@ def copy_firmware_with_timestamp(source, target, env):
         "board": "ESP32-2432S028R",
         "features": [
             "Game Boy & Game Boy Color (Walnut-CGB)",
+            "10-bit PWM Audio & Menu Music (BGM)",
             "Direct SD Sector Streaming (FAT32 cache)",
             "Bluepad32 Bluetooth Gamepads",
             "Hardware Save States"

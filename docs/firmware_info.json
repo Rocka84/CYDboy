@@ -1,13 +1,14 @@
 {
   "project": "CYDboy",
   "version": "v1.1",
-  "build_date": "2026-09-26 01:21",
-  "timestamp": "20260926_012135",
-  "size_bytes": 899904,
-  "size_kb": 878.8,
+  "build_date": "2026-09-27 00:57",
+  "timestamp": "20260927_005706",
+  "size_bytes": 915008,
+  "size_kb": 893.6,
   "board": "ESP32-2432S028R",
   "features": [
     "Game Boy & Game Boy Color (Walnut-CGB)",
+    "10-bit PWM Audio & Menu Music (BGM)",
     "Direct SD Sector Streaming (FAT32 cache)",
     "Bluepad32 Bluetooth Gamepads",
     "Hardware Save States"

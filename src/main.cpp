@@ -8,6 +8,8 @@
 #include "emulator_bridge.h"
 #include "bt_controller.h"
 #include "serial_manager.h"
+#include "audio_output.h"
+#include "bgm_player.h"
 //#include "wifi_upload.h"
 
 static RomEntry* roms = nullptr;
@@ -82,6 +84,7 @@ void run_emu() {
 
         if (menu_req) {
             menu_req = false;
+            audio_enable_output(false);
             int c = launcher_ingame_menu();
             switch(c) {
                 case 0: break;  // resume
@@ -110,6 +113,12 @@ void run_emu() {
                     launcher_settings_menu(&show_fps_overlay, &show_sd_save_overlay); break;
             }
             display_clear(TFT_BLACK);
+            audio_reset();
+            if (audio_get_volume() != AUDIO_VOL_MUTE) {
+                audio_enable_output(true);
+            } else {
+                audio_enable_output(false);
+            }
             controls_visible = !bt_controller_is_connected();
             if (controls_visible) display_draw_controls();
             else display_clear_controls();
@@ -138,6 +147,7 @@ void setup() {
     display_init();
     touch_init();
     button_init();
+    audio_init();
     bt_controller_init();
 
     if(!sd_init()) {
@@ -147,9 +157,11 @@ void setup() {
         while(true) delay(1000);
     }
 
+    bgm_init();
+
     // Splash
     tft.fillScreen(TFT_BLACK); tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(0x07E0); tft.drawString("CYD-GB",SCREEN_W/2,70,4);
+    tft.setTextColor(0x07E0); tft.drawString("CYDboy",SCREEN_W/2,70,4);
     tft.setTextColor(0x7BEF); tft.drawString("Game Boy Emulator",SCREEN_W/2,110,2);
     uint32_t splash_start = millis();
     while (millis() - splash_start < 1200) {
@@ -186,7 +198,9 @@ void loop() {
         return;
     }
     rcnt = sd_scan_roms(roms, MAX_ROMS);
+    bgm_start();
     int sel = launcher_show(roms, rcnt);
+    bgm_stop();
     if (sel == LAUNCHER_SEL_BT_SCANNER) {
         if (roms) { free(roms); roms = nullptr; }
         run_bt_scanner();
@@ -195,6 +209,11 @@ void loop() {
     if (sel == LAUNCHER_SEL_USB_MANAGER) {
         if (roms) { free(roms); roms = nullptr; }
         serial_manager_run();
+        return;
+    }
+    if (sel == LAUNCHER_SEL_SETTINGS) {
+        if (roms) { free(roms); roms = nullptr; }
+        launcher_settings_menu(&show_fps_overlay, &show_sd_save_overlay);
         return;
     }
     // if (sel == LAUNCHER_SEL_WIFI_UPLOAD) {

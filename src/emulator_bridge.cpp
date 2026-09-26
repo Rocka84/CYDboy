@@ -6,14 +6,19 @@
 #include <string.h>
 #include <SD.h>
 
+#ifndef ENABLE_LCD
 #define ENABLE_LCD 1
-#define ENABLE_SOUND 0
+#endif
+#ifndef ENABLE_SOUND
+#define ENABLE_SOUND 1
+#endif
 #define WALNUT_GB_12_COLOUR 1
 #define WALNUT_FULL_GBC_SUPPORT 1
 #define WALNUT_GB_HIGH_LCD_ACCURACY 0
 #define WALNUT_GB_RGB565_BIGENDIAN 0
 #define WALNUT_GB_32BIT_DMA 1
 #define WALNUT_GB_16BIT_DMA 0
+#include "audio_output.h"
 #include "walnut_cgb.h"
 
 #include <ff.h>
@@ -63,19 +68,31 @@ static uint32_t romf_pos = UINT32_MAX;
 static uint32_t cmiss = 0;
 static uint32_t emu_time_us = 0;
 static uint32_t render_time_us = 0;
+static uint32_t s_last_pb = UINT32_MAX;
+static uint8_t* s_last_d = nullptr;
+static int16_t s_last_i = -1;
 
 static inline uint8_t* IRAM_ATTR cget(uint32_t a) {
     uint32_t pb = a & ~PG_MASK;
+    if (pb == s_last_pb) {
+        return &s_last_d[a & PG_MASK];
+    }
     uint16_t h = (pb >> PG_SHIFT) & HASH_M;
     int16_t i = ht[h];
     if (i >= 0 && pg[i].v && pg[i].addr == pb) {
         pg[i].acc = ++acc;
+        s_last_pb = pb;
+        s_last_d = pg[i].d;
+        s_last_i = i;
         return &pg[i].d[a & PG_MASK];
     }
     for (int j = 0; j < npg; j++) {
         if (pg[j].v && pg[j].addr == pb) {
             pg[j].acc = ++acc;
             ht[h] = j;
+            s_last_pb = pb;
+            s_last_d = pg[j].d;
+            s_last_i = j;
             return &pg[j].d[a & PG_MASK];
         }
     }
@@ -111,6 +128,9 @@ static inline uint8_t* IRAM_ATTR cget(uint32_t a) {
     pg[lru].acc = ++acc;
     pg[lru].v = true;
     ht[h] = lru;
+    s_last_pb = pb;
+    s_last_d = pg[lru].d;
+    s_last_i = lru;
     return &pg[lru].d[a & PG_MASK];
 }
 
@@ -201,19 +221,11 @@ static void gb_err(struct gb_s* g, const enum gb_error_e e, const uint16_t a) {
 }
 static void IRAM_ATTR lcd_line(struct gb_s* g, const uint8_t px[160], const uint_fast8_t ln) {
     (void)g;
-    if (!g->direct.frame_skip && fskip > 0 && (fcnt % (fskip + 1)) != 0) return;
+    if (fskip > 0 && (fcnt % (fskip + 1)) != 0) return;
     uint32_t t0 = micros();
-    if (g->cgb.cgbMode) {
-        for (int x = 0; x < GB_SCREEN_W; x++) {
-            lbuf[x] = g->cgb.fixPalette[px[x] & 0x3F];
-        }
-    } else {
-        const uint16_t* p = pals[curpal];
-        for (int x = 0; x < GB_SCREEN_W; x++) {
-            lbuf[x] = p[px[x] & 3];
-        }
-    }
-    display_push_gb_line(ln, lbuf);
+    const uint16_t* p = g->cgb.cgbMode ? g->cgb.fixPalette : pals[curpal];
+    uint8_t mask = g->cgb.cgbMode ? 0x3F : 0x03;
+    display_push_gb_line(ln, px, p, mask);
     render_time_us += (micros() - t0);
 }
 
@@ -322,10 +334,14 @@ bool emu_open_rom(const char* path) {
     return true;
 }
 void emu_close_rom() {
+    audio_enable_output(false);
     if (romf) romf.close();
     romlen = 0;
     romf_pos = UINT32_MAX;
     num_extents = 0;
+    s_last_pb = UINT32_MAX;
+    s_last_d = nullptr;
+    s_last_i = -1;
     for (int i = 0; i < PG_N; i++) {
         if (pg[i].d) { free(pg[i].d); pg[i].d = nullptr; }
         pg[i].v = false;
@@ -444,6 +460,12 @@ bool emu_init(uint8_t*, uint32_t) {
         return false;
     }
     gb_init_lcd(gb, lcd_line);
+    audio_reset();
+    if (audio_get_volume() != AUDIO_VOL_MUTE) {
+        audio_enable_output(true);
+    } else {
+        audio_enable_output(false);
+    }
     if (fskip > 0) gb->direct.frame_skip = true;
     Serial.printf("[EMU] Core: Walnut-CGB | Mode: %s\n", gb->cgb.cgbMode ? "Game Boy Color" : "DMG Classic");
     Serial.printf("[EMU] %d pages allocated (%d KB pool). RAM: %u. Free heap: %u\n",
@@ -466,17 +488,24 @@ void emu_run_frame() {
     gb->direct.joypad_bits.select=!(jpad&0x40); gb->direct.joypad_bits.start=!(jpad&0x80);
     gb->direct.joypad_bits.right=!(jpad&0x01); gb->direct.joypad_bits.left=!(jpad&0x02);
     gb->direct.joypad_bits.up=!(jpad&0x04); gb->direct.joypad_bits.down=!(jpad&0x08);
+
+    bool should_draw = (fskip == 0) || ((fcnt % (fskip + 1)) == 0);
+    gb->direct.frame_skip = !should_draw;
+    gb->display.frame_skip_count = should_draw ? 1 : 0;
+
     uint32_t t0 = micros();
     gb_run_frame(gb);
     emu_time_us += (micros() - t0);
+    audio_process_frame();
     fcnt++; fpsc++;
     uint32_t n=millis();
     if(n-fpst>=1000){
         cfps=fpsc;
+        audio_set_fps(cfps);
         uint32_t e_avg = fpsc ? (emu_time_us / fpsc) : 0;
         uint32_t r_avg = fpsc ? (render_time_us / fpsc) : 0;
-        Serial.printf("[PERF] FPS: %u | emu: %u ms | render: %u ms | misses/s: %u | heap: %u | npg: %d | ext: %d\n",
-                      cfps, e_avg / 1000, r_avg / 1000, cmiss, ESP.getFreeHeap(), npg, num_extents);
+        Serial.printf("[PERF] FPS: %u | fs: %u | emu: %u ms | render: %u ms | misses/s: %u | heap: %u | npg: %d | ext: %d\n",
+                      cfps, fskip, e_avg / 1000, r_avg / 1000, cmiss, ESP.getFreeHeap(), npg, num_extents);
         fpsc=0; fpst=n; cmiss=0; emu_time_us=0; render_time_us=0;
     }
 }
@@ -634,6 +663,7 @@ bool emu_load_state(const char* rom_path) {
     for (int i = 0; i < PG_N; i++) pg[i].v = false;
     memset(ht, -1, sizeof(ht));
     fcnt = 0;
+    audio_reset();
 
     Serial.printf("[STATE] State loaded: %s\n", path);
     return true;

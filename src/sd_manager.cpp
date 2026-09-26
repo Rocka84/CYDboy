@@ -46,7 +46,10 @@ int sd_scan_roms(RomEntry* l, int mx) {
     // Sort
     for(int i=0;i<c-1;i++) for(int j=i+1;j<c;j++)
         if(strcasecmp(l[i].filename,l[j].filename)>0){RomEntry t=l[i];l[i]=l[j];l[j]=t;}
-    Serial.printf("[SD] Found %d ROMs\n",c);
+    Serial.printf("[SD] Found %d ROMs:\n",c);
+    for (int i = 0; i < c; i++) {
+        Serial.printf("  [%d] %s (%u KB)\n", i, l[i].filename, l[i].size / 1024);
+    }
     return c;
 }
 

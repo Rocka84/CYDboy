@@ -6,6 +6,8 @@
 #include "serial_manager.h"
 #include "bt_controller.h"
 #include "hw_config.h"
+#include "audio_output.h"
+#include "bgm_player.h"
 #include <Arduino.h>
 
 #define ITEMS_PP 5
@@ -46,7 +48,7 @@ static void draw_header(const char* t) {
 
 // ─── ROM List ───────────────────────────────────────────────────────────────
 static void draw_list(RomEntry* r, int cnt, int pg, int sel) {
-	int total = cnt + 2; // extra entries: BT scanner, USB ROM Manager
+	int total = cnt + 3; // extra entries: BT scanner, USB ROM Manager, Settings
 	int s = pg*ITEMS_PP, e = min(s+ITEMS_PP, total);
 	tft.fillRect(0,38,SCREEN_W,202,TFT_BLACK);
 
@@ -86,7 +88,7 @@ static void draw_list(RomEntry* r, int cnt, int pg, int sel) {
 			bool bt_conn = bt_controller_is_connected();
 			tft.setTextColor(bt_conn ? 0x07E0 : 0x7BEF, bg); tft.setTextDatum(MR_DATUM);
 			tft.drawString(bt_conn ? "CONNECTED" : "PAIRING", SCREEN_W-12, y+ITEM_H/2-2, 1);
-		} else {
+		} else if (i == cnt + 1) {
 			// Virtual app entry: USB ROM Manager
 			tft.fillRoundRect(ITEM_X+3,y+5,26,18,3,0xFDE0);
 			tft.setTextColor(TFT_BLACK,0xFDE0); tft.setTextDatum(MC_DATUM);
@@ -97,11 +99,24 @@ static void draw_list(RomEntry* r, int cnt, int pg, int sel) {
 
 			tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
 			tft.drawString("SYNC",SCREEN_W-12,y+ITEM_H/2-2,1);
+		} else {
+			// Virtual app entry: System Settings
+			tft.fillRoundRect(ITEM_X+3,y+5,26,18,3,0xFD20);
+			tft.setTextColor(TFT_BLACK,0xFD20); tft.setTextDatum(MC_DATUM);
+			tft.drawString("SET",ITEM_X+16,y+14,1);
+
+			tft.setTextColor(fg,bg); tft.setTextDatum(ML_DATUM);
+			tft.drawString("System Settings",ITEM_X+34,y+ITEM_H/2-2,2);
+
+			tft.setTextColor(0x7BEF,bg); tft.setTextDatum(MR_DATUM);
+			tft.drawString("CONFIG",SCREEN_W-12,y+ITEM_H/2-2,1);
 		}
 	}
 
 	// Nav bar
 	tft.fillRect(0,SCREEN_H-20,SCREEN_W,20,0x18C3);
+	tft.setTextColor(0x07E0,0x18C3); tft.setTextDatum(ML_DATUM);
+	tft.drawString("[SET]",5,SCREEN_H-10,1);
 	int tp = (total+ITEMS_PP-1)/ITEMS_PP;
 	if (tp>1) {
 		tft.setTextColor(TFT_WHITE,0x18C3); tft.setTextDatum(MC_DATUM);
@@ -120,7 +135,7 @@ int launcher_show(RomEntry* roms, int cnt) {
 	draw_list(roms,cnt,pg,sel);
 	uint16_t prev = 0;
 	uint32_t dbg_t = 0;
-	int total = cnt + 2;
+	int total = cnt + 3;
 	int tp = (total+ITEMS_PP-1)/ITEMS_PP;
 	bool last_conn = bt_controller_is_connected();
 	while (true) {
@@ -153,19 +168,22 @@ int launcher_show(RomEntry* roms, int cnt) {
 					} else {
 						if (sel == cnt) return LAUNCHER_SEL_BT_SCANNER;
 						if (sel == cnt + 1) return LAUNCHER_SEL_USB_MANAGER;
+						if (sel == cnt + 2) return LAUNCHER_SEL_SETTINGS;
 						return sel;
 					}
 				}
 			}
 			if (ty >= SCREEN_H - 24) {
-				if (tx < 70 && pg > 0) {
-					pg--; sel = pg * ITEMS_PP; draw_list(roms, cnt, pg, sel); delay(250);
-				} else if (tx > SCREEN_W - 60) {
+				if (tx < 50) {
+					return LAUNCHER_SEL_SETTINGS;
+				} else if (tx > SCREEN_W - 50) {
 					touch_run_calibration();
 					draw_header("Game Boy ROMs");
 					draw_list(roms, cnt, pg, sel);
 					delay(250);
-				} else if (tx > 70 && tx < SCREEN_W - 60 && pg < tp - 1) {
+				} else if (tx >= 50 && tx < 100 && pg > 0) {
+					pg--; sel = pg * ITEMS_PP; draw_list(roms, cnt, pg, sel); delay(250);
+				} else if (tx >= 140 && tx <= SCREEN_W - 50 && pg < tp - 1) {
 					pg++; sel = pg * ITEMS_PP; draw_list(roms, cnt, pg, sel); delay(250);
 				}
 			}
@@ -193,6 +211,7 @@ int launcher_show(RomEntry* roms, int cnt) {
 		if ((b & GB_BTN_A) && !(prev & GB_BTN_A)) {
 			if (sel == cnt) return LAUNCHER_SEL_BT_SCANNER;
 			if (sel == cnt + 1) return LAUNCHER_SEL_USB_MANAGER;
+			if (sel == cnt + 2) return LAUNCHER_SEL_SETTINGS;
 			return sel;
 		}
 
@@ -286,14 +305,20 @@ int launcher_ingame_menu() {
 }
 
 // ─── Settings menu ──────────────────────────────────────────────────────────
+#if ENABLE_SOUND
+#define SETTINGS_NUM_ROWS 6
+#define SETTINGS_ROW_DONE 5
+#else
+#define SETTINGS_NUM_ROWS 4
+#define SETTINGS_ROW_DONE 3
+#endif
+
 void launcher_settings_menu(bool* show_fps_overlay, bool* show_save_overlay) {
 	uint8_t pal = emu_get_palette();
 	uint8_t fs = emu_get_frame_skip();
 	uint8_t bl = 255; // brightness
-	(void)show_fps_overlay;
-	(void)show_save_overlay;
+	touch_load_settings(&pal, &fs, &bl, show_fps_overlay, show_save_overlay);
 
-	// Selected row: 0=palette,1=frameskip,2=brightness,3=done
 	int sel = 0;
 	uint16_t prev = 0;
 
@@ -308,43 +333,76 @@ void launcher_settings_menu(bool* show_fps_overlay, bool* show_save_overlay) {
 		tft.setTextColor(0xFFE0); tft.drawString("SETTINGS",SCREEN_W/2,15,4);
 
 		// Palette
-		tft.setTextColor(TFT_WHITE); tft.drawString("Color Palette:",SCREEN_W/2,50,2);
+		tft.setTextColor(TFT_WHITE); tft.drawString("Color Palette:",SCREEN_W/2,40,2);
 		uint16_t palbg = (selrow==0)?0x2945:0x1082;
-		tft.fillRoundRect(row_x,65,row_w,28,5,palbg);
+		tft.fillRoundRect(row_x,52,row_w,24,5,palbg);
 		char palstr[40]; snprintf(palstr,40,"%d/%d %s",pal+1,NUM_PALETTES,emu_get_palette_name(pal));
 		tft.setTextColor(0x07E0,palbg);
-		tft.drawString(palstr,SCREEN_W/2,79,2);
+		tft.drawString(palstr,SCREEN_W/2,64,2);
 		tft.setTextColor(0x7BEF,palbg);
-		tft.setTextDatum(ML_DATUM); tft.drawString("<<",arrow_l,79,2);
-		tft.setTextDatum(MR_DATUM); tft.drawString(">>",arrow_r,79,2);
+		tft.setTextDatum(ML_DATUM); tft.drawString("<<",arrow_l,64,2);
+		tft.setTextDatum(MR_DATUM); tft.drawString(">>",arrow_r,64,2);
 
 		// Frame skip
 		tft.setTextDatum(MC_DATUM);
-		tft.setTextColor(TFT_WHITE); tft.drawString("Frame Skip:",SCREEN_W/2,105,2);
 		uint16_t fsbg = (selrow==1)?0x2945:0x1082;
-		tft.fillRoundRect(row_x,120,row_w,28,5,fsbg);
-		char fss[16]; snprintf(fss,16,"%d (FPS ~%d)",fs, fs==0?60:60/(fs+1));
-		tft.setTextColor(0x07E0,fsbg); tft.drawString(fss,SCREEN_W/2,134,2);
+		tft.fillRoundRect(row_x,97,row_w,24,5,fsbg);
+		char fss[32];
+		if (fs == 0) snprintf(fss, sizeof(fss), "0 (No Skip, 40 FPS)");
+		else if (fs == 1) snprintf(fss, sizeof(fss), "1 (Fast, 60 FPS)");
+		else if (fs == 2) snprintf(fss, sizeof(fss), "2 (Smooth 60 FPS)");
+		else snprintf(fss, sizeof(fss), "%d (Skip %d)", fs, fs);
+		tft.setTextColor(0x07E0,fsbg); tft.drawString(fss,SCREEN_W/2,109,2);
 		tft.setTextColor(0x7BEF,fsbg);
-		tft.setTextDatum(ML_DATUM); tft.drawString("<",arrow_l,134,2);
-		tft.setTextDatum(MR_DATUM); tft.drawString(">",arrow_r,134,2);
+		tft.setTextDatum(ML_DATUM); tft.drawString("<",arrow_l,109,2);
+		tft.setTextDatum(MR_DATUM); tft.drawString(">",arrow_r,109,2);
 
 		// Brightness
 		tft.setTextDatum(MC_DATUM);
-		tft.setTextColor(TFT_WHITE); tft.drawString("Brightness:",SCREEN_W/2,160,2);
+		tft.setTextColor(TFT_WHITE); tft.drawString("Brightness:",SCREEN_W/2,130,2);
 		uint16_t blbg = (selrow==2)?0x2945:0x1082;
-		tft.fillRoundRect(row_x,175,row_w,28,5,blbg);
+		tft.fillRoundRect(row_x,142,row_w,24,5,blbg);
 		char bls[16]; snprintf(bls,16,"%d%%",bl*100/255);
-		tft.setTextColor(0x07E0,blbg); tft.drawString(bls,SCREEN_W/2,189,2);
+		tft.setTextColor(0x07E0,blbg); tft.drawString(bls,SCREEN_W/2,154,2);
 		tft.setTextColor(0x7BEF,blbg);
-		tft.setTextDatum(ML_DATUM); tft.drawString("<",arrow_l,189,2);
-		tft.setTextDatum(MR_DATUM); tft.drawString(">",arrow_r,189,2);
+		tft.setTextDatum(ML_DATUM); tft.drawString("<",arrow_l,154,2);
+		tft.setTextDatum(MR_DATUM); tft.drawString(">",arrow_r,154,2);
+
+#if ENABLE_SOUND
+		// Game Sound
+		tft.setTextDatum(MC_DATUM);
+		tft.setTextColor(TFT_WHITE); tft.drawString("Game Sound:",SCREEN_W/2,175,2);
+		uint16_t sndbg = (selrow==3)?0x2945:0x1082;
+		tft.fillRoundRect(row_x,187,row_w,24,5,sndbg);
+		tft.setTextColor(0x07E0,sndbg); tft.drawString(audio_get_volume_str(),SCREEN_W/2,199,2);
+		tft.setTextColor(0x7BEF,sndbg);
+		tft.setTextDatum(ML_DATUM); tft.drawString("<",arrow_l,199,2);
+		tft.setTextDatum(MR_DATUM); tft.drawString(">",arrow_r,199,2);
+
+		// Menu Music (BGM)
+		tft.setTextDatum(MC_DATUM);
+		tft.setTextColor(TFT_WHITE); tft.drawString("Menu Music (BGM):",SCREEN_W/2,220,2);
+		uint16_t bgmbg = (selrow==4)?0x2945:0x1082;
+		tft.fillRoundRect(row_x,232,row_w,24,5,bgmbg);
+		bool bgm_on = bgm_is_enabled();
+		tft.setTextColor(bgm_on ? 0x07E0 : 0xF800, bgmbg);
+		tft.drawString(bgm_on ? "ENABLED" : "DISABLED", SCREEN_W/2, 244, 2);
+		tft.setTextColor(0x7BEF,bgmbg);
+		tft.setTextDatum(ML_DATUM); tft.drawString("<",arrow_l,244,2);
+		tft.setTextDatum(MR_DATUM); tft.drawString(">",arrow_r,244,2);
 
 		// Done button
-		uint16_t donebg = (selrow==3)?0x2945:0x07E0;
-		tft.fillRoundRect(100,302,120,16,5,donebg);
+		uint16_t donebg = (selrow==5)?0x2945:0x07E0;
+		tft.fillRoundRect(60,272,120,28,5,donebg);
 		tft.setTextColor(TFT_BLACK,donebg); tft.setTextDatum(MC_DATUM);
-		tft.drawString("DONE",SCREEN_W/2,310,1);
+		tft.drawString("DONE",SCREEN_W/2,286,2);
+#else
+		// Done button (no sound options)
+		uint16_t donebg = (selrow==3)?0x2945:0x07E0;
+		tft.fillRoundRect(60,195,120,32,5,donebg);
+		tft.setTextColor(TFT_BLACK,donebg); tft.setTextDatum(MC_DATUM);
+		tft.drawString("DONE",SCREEN_W/2,211,2);
+#endif
 	};
 
 	draw_settings(sel);
@@ -356,34 +414,56 @@ void launcher_settings_menu(bool* show_fps_overlay, bool* show_save_overlay) {
 
 		if (touch_is_pressed()) {
 			int16_t tx = touch_get_x(), ty = touch_get_y();
-			if (ty >= 65 && ty < 93) {
+			if (ty >= 40 && ty < 80) {
 				if (tx < 120) { pal = (pal+NUM_PALETTES-1)%NUM_PALETTES; }
 				else { pal = (pal+1)%NUM_PALETTES; }
 				emu_set_palette(pal);
 				draw_settings(0);
 				delay(200);
-			} else if (ty >= 120 && ty < 148) {
+			} else if (ty >= 85 && ty < 125) {
 				if (tx < 120 && fs > 0) fs--;
 				else if (tx >= 120 && fs < 4) fs++;
 				emu_set_frame_skip(fs);
 				draw_settings(1);
 				delay(200);
-			} else if (ty >= 175 && ty < 203) {
+			} else if (ty >= 130 && ty < 170) {
 				if (tx < 120 && bl > 30) bl -= 25;
 				else if (tx >= 120 && bl < 255) bl = min(255, bl + 25);
 				display_set_backlight(bl);
 				draw_settings(2);
 				delay(200);
-			} else if (ty >= 295) {
+#if ENABLE_SOUND
+			} else if (ty >= 175 && ty < 215) {
+				if (tx < 120) {
+					uint8_t v = audio_get_volume();
+					if (v > 0) audio_set_volume(v - 1);
+				} else {
+					uint8_t v = audio_get_volume();
+					if (v < 3) audio_set_volume(v + 1);
+				}
+				draw_settings(3);
+				delay(200);
+			} else if (ty >= 220 && ty < 260) {
+				bgm_set_enabled(!bgm_is_enabled());
+				draw_settings(4);
+				delay(200);
+			} else if (ty >= 265) {
 				touch_save_settings(pal, fs, bl, false, false);
 				wait_release();
 				return;
 			}
+#else
+			} else if (ty >= 185) {
+				touch_save_settings(pal, fs, bl, false, false);
+				wait_release();
+				return;
+			}
+#endif
 		}
 
 		// Navigation: up/down change selected row (edge detect)
-		if ((b & GB_BTN_UP) && !(prev & GB_BTN_UP)) { sel = (sel==0)?3:sel-1; draw_settings(sel); }
-		if ((b & GB_BTN_DOWN) && !(prev & GB_BTN_DOWN)) { sel = (sel+1)%4; draw_settings(sel); }
+		if ((b & GB_BTN_UP) && !(prev & GB_BTN_UP)) { sel = (sel==0)?SETTINGS_NUM_ROWS-1:sel-1; draw_settings(sel); }
+		if ((b & GB_BTN_DOWN) && !(prev & GB_BTN_DOWN)) { sel = (sel+1)%SETTINGS_NUM_ROWS; draw_settings(sel); }
 
 		// Row actions (use edge detection where appropriate)
 		if (sel==0) {
@@ -395,7 +475,23 @@ void launcher_settings_menu(bool* show_fps_overlay, bool* show_save_overlay) {
 		} else if (sel==2) {
 			if ((b & GB_BTN_LEFT) && !(prev & GB_BTN_LEFT)) { if (bl>30) { bl-=25; display_set_backlight(bl); draw_settings(sel); } }
 			if ((b & GB_BTN_RIGHT) && !(prev & GB_BTN_RIGHT)) { if (bl<255) { bl=min(255,bl+25); display_set_backlight(bl); draw_settings(sel); } }
+#if ENABLE_SOUND
 		} else if (sel==3) {
+			if ((b & GB_BTN_LEFT) && !(prev & GB_BTN_LEFT)) {
+				uint8_t v = audio_get_volume();
+				if (v > 0) { audio_set_volume(v - 1); draw_settings(sel); }
+			}
+			if ((b & GB_BTN_RIGHT) && !(prev & GB_BTN_RIGHT)) {
+				uint8_t v = audio_get_volume();
+				if (v < 3) { audio_set_volume(v + 1); draw_settings(sel); }
+			}
+		} else if (sel==4) {
+			if (((b & GB_BTN_LEFT) && !(prev & GB_BTN_LEFT)) || ((b & GB_BTN_RIGHT) && !(prev & GB_BTN_RIGHT))) {
+				bgm_set_enabled(!bgm_is_enabled());
+				draw_settings(sel);
+			}
+#endif
+		} else if (sel==SETTINGS_ROW_DONE) {
 			if ((b & GB_BTN_A) && !(prev & GB_BTN_A)) {
 				touch_save_settings(pal, fs, bl, false, false);
 				wait_release();
@@ -403,10 +499,25 @@ void launcher_settings_menu(bool* show_fps_overlay, bool* show_save_overlay) {
 			}
 		}
 
-		// A anywhere acts as confirm for done as well
-		if ((b & GB_BTN_A) && !(prev & GB_BTN_A) && sel>=0 && sel<=2) {
-			// if not on DONE, treat A as toggle to next row (optional)
-			sel = (sel+1)%4; draw_settings(sel);
+		// A button on actionable rows
+		if ((b & GB_BTN_A) && !(prev & GB_BTN_A)) {
+#if ENABLE_SOUND
+			if (sel == 3) {
+				audio_cycle_volume();
+				draw_settings(sel);
+			} else if (sel == 4) {
+				bgm_set_enabled(!bgm_is_enabled());
+				draw_settings(sel);
+			} else if (sel < SETTINGS_ROW_DONE) {
+				sel = (sel+1)%SETTINGS_NUM_ROWS;
+				draw_settings(sel);
+			}
+#else
+			if (sel < SETTINGS_ROW_DONE) {
+				sel = (sel+1)%SETTINGS_NUM_ROWS;
+				draw_settings(sel);
+			}
+#endif
 		}
 
 		prev = b;

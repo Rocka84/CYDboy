@@ -933,6 +933,7 @@
       <span class="pill-tag">🚀 50+ FPS Direct SD Streaming</span>
       <span class="pill-tag">📡 Bluetooth Gamepads</span>
       <span class="pill-tag">💾 True Save States</span>
+      <span class="pill-tag">🔊 10-bit PWM Audio &amp; BGM</span>
       <span class="pill-tag">⚡ No PSRAM Required</span>
       <span class="pill-tag">📺 Pixel-accurate 10:9 Display</span>
     </div>
@@ -967,6 +968,14 @@
           </div>
           <h3>Full GBC + DMG Support</h3>
           <p>Powered by the Walnut-CGB core. Runs both original monochrome Game Boy titles and full Game Boy Color games with dual-speed 8MHz CPU, 32KB WRAM, and authentic hardware color palettes.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-badge">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          </div>
+          <h3>10-bit PWM Audio &amp; Menu BGM</h3>
+          <p>High-resolution 10-bit PWM audio (78.1 kHz carrier) on GPIO 26 via onboard SC8002B amplifier. Real-time 4-channel Game Boy APU synthesis, SD menu music streaming (/bgm.wav), and instant runtime toggle (OFF / LOW / MED / HIGH) with full save state compatibility.</p>
         </div>
 
         <div class="feature-card">
@@ -1178,7 +1187,8 @@
           <p style="margin-top: 8px;">
             <code>/roms/gb/</code> &nbsp;Classic (.gb)<br>
             <code>/roms/gbc/</code> &nbsp;Color (.gbc)<br>
-            <code>/saves/</code> &nbsp;Saves &amp; States
+            <code>/saves/</code> &nbsp;Saves &amp; States<br>
+            <code>/bgm.wav</code> &nbsp;Optional menu music
           </p>
         </div>
 
@@ -1206,9 +1216,10 @@
       <div class="footer-links">
         <span style="font-weight: 600; color: var(--text);">Open Source Credits</span>
         <a href="https://github.com/artanergin44-collab/cyd-gb" target="_blank" rel="noopener">artanergin44-collab/cyd-gb</a>
+        <a href="https://github.com/Gronis/walnut" target="_blank" rel="noopener">Walnut &amp; Peanut-GB Cores</a>
+        <a href="https://github.com/robmikh/minigb_apu" target="_blank" rel="noopener">minigb_apu Sound Synthesis</a>
         <a href="https://github.com/ricardoquesada/bluepad32" target="_blank" rel="noopener">Bluepad32 Gamepad Stack</a>
         <a href="https://github.com/Bodmer/TFT_eSPI" target="_blank" rel="noopener">TFT_eSPI Display Driver</a>
-        <a href="https://github.com/Bodmer/TFT_eSPI" target="_blank" rel="noopener">Walnut &amp; Peanut-GB Cores</a>
       </div>
     </div>
   </footer>
