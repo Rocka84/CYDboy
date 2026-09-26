@@ -3,7 +3,10 @@
 *.o
 *.elf
 *.bin
+!docs/firmware.bin
+!tools/web-installer/firmware.bin
 *.hex
 *.pioenvs/
 .DS_Store
 roms/
+.external/

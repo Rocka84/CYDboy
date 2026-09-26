@@ -1,8 +1,28 @@
-# 🎮 CYD-GB
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="CYDboy Logo" width="420">
+</p>
 
-**Game Boy (DMG) & Game Boy Color (GBC) emulator for the ESP32 Cheap Yellow Display (ESP32-2432S028R) — featuring full CGB color support, touchscreen controls, Bluetooth gamepads, USB Web ROM management, true Save States, and accurate 10:9 display scaling.**
+<p align="center">
+  <strong>Game Boy (DMG) & Game Boy Color (GBC) on the ESP32 Cheap Yellow Display (ESP32-2432S028R)</strong>
+</p>
 
-Run Game Boy and Game Boy Color games smoothly on a stock $15 CYD board without requiring external PSRAM or physical buttons. Just flash, insert a microSD card with your ROMs, and play!
+<p align="center">
+  <a href="https://rocka84.github.io/CYDboy/"><img src="https://img.shields.io/badge/⚡_1--Click_Web_Flasher-Live_Site-00f2fe?style=for-the-badge" alt="Web Flasher"></a>
+  <a href="https://github.com/Rocka84/CYDboy"><img src="https://img.shields.io/badge/GitHub-Rocka84%2FCYDboy-facc15?style=for-the-badge&logo=github" alt="GitHub Repo"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-10b981?style=for-the-badge" alt="License"></a>
+</p>
+
+---
+
+## 🌟 Overview & Web Portal
+
+**CYDboy** brings the legendary Nintendo Game Boy and Game Boy Color gaming experience to the ESP32-2432S028R "Cheap Yellow Display" (CYD). 
+
+Featuring full CGB color emulation (Walnut-CGB), direct FAT32 cluster streaming from microSD (zero PSRAM needed!), Bluetooth gamepad pairing, hardware save states, and a **1-click Web Serial flasher** right in your browser.
+
+> ⚡ **Try it now in your browser:**  
+> **[https://rocka84.github.io/CYDboy/](https://rocka84.github.io/CYDboy/)**  
+> Flash the latest firmware and manage your microSD ROMs over USB without installing any software or compilers!
 
 ---
 
@@ -13,7 +33,7 @@ Run Game Boy and Game Boy Color games smoothly on a stock $15 CYD board without 
 - **High-Performance Direct SD Streaming** — Direct FAT32 cluster table traversal to build contiguous disk extents on ROM open. Uses raw SPI sector reads (`SD.readRAW`) bypassing VFS overhead, backed by a 512-byte hardware-aligned page cache with hash indexing for fluid 50+ FPS gameplay with 0 misses.
 - **Bluetooth Gamepad Support (Bluepad32)** — Connect Xbox, PlayStation (PS4/PS5), Nintendo Switch Pro, 8BitDo, and generic Bluetooth controllers. Auto-pauses background inquiry scanning once connected for ultra-low latency.
 - **Auto-Hiding Touch Controls** — Automatically hides on-screen controls when a Bluetooth controller connects, freeing up the display.
-- **Web Serial ROM Manager** — Upload `.gb` / `.gbc` ROMs and manage files directly over USB via Google Chrome or Edge using `tools/web-installer/index.html` (no need to remove the SD card!).
+- **1-Click Web Flasher & SD ROM Manager** — Flash releases in 1 click and upload `.gb` / `.gbc` ROMs directly over USB via Google Chrome or Edge at [https://rocka84.github.io/CYDboy/](https://rocka84.github.io/CYDboy/).
 - **True Save States** — Full emulator state serialization (CPU, registers, timers, VRAM, WRAM, OAM, I/O, palettes, cart RAM) saved to `/saves/<rom>.state`. Supports long filenames (up to 160 characters) and instant resume from the pause menu!
 - **Battery Saves (SRAM)** — Automatic `.sav` battery backup for cartridge games (Pokémon, Zelda, Wario Land, etc.).
 - **20 Curated Color Palettes (DMG Mode)** — Classic Green, Original DMG, Pocket Gray, Warm Sepia, Lava, Neon, Ocean, Forest, Gold, and more for classic monochrome Game Boy titles.
@@ -35,12 +55,20 @@ Run Game Boy and Game Boy Color games smoothly on a stock $15 CYD board without 
 
 ## 🚀 Quick Start
 
-### 1. Clone the Repository
+### Option A: 1-Click Web Flasher (Recommended)
+
+1. Connect your CYD to your computer via USB-C.
+2. Open **[https://rocka84.github.io/CYDboy/](https://rocka84.github.io/CYDboy/)** in Google Chrome or Microsoft Edge.
+3. Click **"Connect & Flash CYDboy"**. That's it!
+
+### Option B: Build from Source (PlatformIO)
 
 ```bash
-git clone https://github.com/artanergin44-collab/cyd-gb.git
-cd cyd-gb
+git clone https://github.com/Rocka84/CYDboy.git
+cd CYDboy
+pio run -t upload --upload-port /dev/ttyUSB0
 ```
+
 
 ### 2. Prepare the MicroSD Card
 
@@ -72,18 +100,19 @@ pio device monitor -b 115200 --port /dev/ttyUSB0
 
 ---
 
-## 🌐 Web Serial ROM Manager & Installer
+## 🌐 Web Serial 1-Click Flasher & ROM Manager
 
-CYD-GB includes a browser-based installer and SD file manager located in [`tools/web-installer/index.html`](tools/web-installer/index.html).
+CYDboy includes a full browser-based 1-click flasher and SD file manager hosted live on GitHub Pages:
 
-1. Open `tools/web-installer/index.html` in **Google Chrome** or **Microsoft Edge**.
-2. On the CYD launcher screen, select **"USB ROM Manager"**.
-3. In the web interface, click **Connect to CYD** and choose your device's USB serial port.
-4. You can now:
-   - View SD card storage usage (total, used, free space).
-   - Drag & drop `.gb` and `.gbc` ROMs (handles filenames with spaces, chunked uploads, and progress bars).
-   - Delete unwanted ROMs from the SD card.
-   - Flash precompiled firmware binaries directly from the browser.
+👉 **[https://rocka84.github.io/CYDboy/](https://rocka84.github.io/CYDboy/)**  
+*(Also available locally at [`docs/index.html`](docs/index.html))*
+
+1. Open the page in **Google Chrome** or **Microsoft Edge**.
+2. **To Flash:** Connect your CYD via USB and click **"Connect & Flash CYDboy"** — no file downloads or IDE required!
+3. **To Manage SD ROMs:**
+   - On the CYD launcher screen, select **"USB ROM Manager"**.
+   - Click **Connect CYD USB** in the web interface.
+   - View SD storage capacity, drag & drop `.gb` and `.gbc` ROMs, or delete titles directly.
 
 ---
 
@@ -167,7 +196,8 @@ cyd-gb/
 ---
 
 ## 📜 Credits & License
-
+ 
+- **[artanergin44-collab/cyd-gb](https://github.com/artanergin44-collab/cyd-gb)** — Upstream project and foundation for the initial ESP32 Cheap Yellow Display Game Boy port.
 - **[Walnut](https://github.com/Gronis/walnut)** — High-performance, portable Game Boy & Game Boy Color emulator core (MIT License).
 - **[Peanut-GB](https://github.com/deltabeard/Peanut-GB)** — Original lightweight DMG emulator core reference by Mahyar Koshkouei (MIT License).
 - **[Bluepad32](https://github.com/ricardoquesada/bluepad32)** — Bluetooth gamepad library by Ricardo Quesada.
@@ -175,3 +205,4 @@ cyd-gb/
 - **[ESP32 Cheap Yellow Display Community](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display)** — Hardware documentation and pinouts.
 
 Licensed under the **MIT License**.
+

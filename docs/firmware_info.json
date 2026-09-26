@@ -1,0 +1,17 @@
+{
+  "project": "CYDboy",
+  "version": "v1.1",
+  "build_date": "2026-09-26 01:21",
+  "timestamp": "20260926_012135",
+  "size_bytes": 899904,
+  "size_kb": 878.8,
+  "board": "ESP32-2432S028R",
+  "features": [
+    "Game Boy & Game Boy Color (Walnut-CGB)",
+    "Direct SD Sector Streaming (FAT32 cache)",
+    "Bluepad32 Bluetooth Gamepads",
+    "Hardware Save States"
+  ],
+  "upstream": "https://github.com/artanergin44-collab/cyd-gb",
+  "repository": "https://github.com/Rocka84/cydboy"
+}
