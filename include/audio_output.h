@@ -32,6 +32,8 @@ bool audio_is_enabled();
 size_t audio_ring_buf_free();
 bool audio_ring_buf_push(uint16_t sample);
 void audio_start_playback();
+void audio_play_ui_click();
+void audio_play_ui_select();
 
 extern struct minigb_apu_ctx apu_ctx;
 
@@ -61,6 +63,8 @@ static inline bool audio_is_enabled() { return false; }
 static inline size_t audio_ring_buf_free() { return 0; }
 static inline bool audio_ring_buf_push(uint16_t sample) { (void)sample; return false; }
 static inline void audio_start_playback() {}
+static inline void audio_play_ui_click() {}
+static inline void audio_play_ui_select() {}
 
 #ifdef __cplusplus
 extern "C" {

@@ -180,6 +180,7 @@ static uint8_t curpal = 0;
 void emu_set_palette(uint8_t i) { if (i<NUM_PALETTES) curpal=i; }
 uint8_t emu_get_palette() { return curpal; }
 const char* emu_get_palette_name(uint8_t i) { return (i<NUM_PALETTES)?palnames[i]:"?"; }
+const uint16_t* emu_get_palette_colors(uint8_t i) { return (i<NUM_PALETTES)?pals[i]:pals[0]; }
 
 // ─── Callbacks ──────────────────────────────────────────────────────────────
 static uint8_t IRAM_ATTR gb_rom_read(struct gb_s* g, const uint_fast32_t a) {

@@ -237,4 +237,9 @@ void bgm_stop() {
 bool bgm_is_playing() {
     return s_bgm_running;
 }
+
+bool bgm_file_exists() {
+    return SD.exists("/bgm.wav");
+}
 #endif // ENABLE_SOUND
+

@@ -272,4 +272,36 @@ void audio_cycle_volume() {
     uint8_t next = (s_volume + 1) % 4;
     audio_set_volume(next);
 }
+
+void audio_play_ui_click() {
+    if (s_volume == AUDIO_VOL_MUTE) return;
+    if (!s_output_enabled) audio_enable_output(true);
+    int amp = 60 * s_volume;
+    for (int i = 0; i < 220; i++) {
+        uint16_t sample = (i % 16 < 8) ? (512 + amp) : (512 - amp);
+        audio_ring_buf_push(sample);
+    }
+    if (!s_timer_started && s_audio_timer) {
+        timerAlarmEnable(s_audio_timer);
+        s_timer_started = true;
+    }
+}
+
+void audio_play_ui_select() {
+    if (s_volume == AUDIO_VOL_MUTE) return;
+    if (!s_output_enabled) audio_enable_output(true);
+    int amp = 80 * s_volume;
+    for (int i = 0; i < 180; i++) {
+        uint16_t sample = (i % 12 < 6) ? (512 + amp) : (512 - amp);
+        audio_ring_buf_push(sample);
+    }
+    for (int i = 0; i < 180; i++) {
+        uint16_t sample = (i % 8 < 4) ? (512 + amp) : (512 - amp);
+        audio_ring_buf_push(sample);
+    }
+    if (!s_timer_started && s_audio_timer) {
+        timerAlarmEnable(s_audio_timer);
+        s_timer_started = true;
+    }
+}
 #endif // ENABLE_SOUND

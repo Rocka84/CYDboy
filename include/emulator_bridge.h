@@ -24,6 +24,7 @@ uint16_t* emu_get_line_buffer();
 void emu_set_palette(uint8_t idx);
 uint8_t emu_get_palette();
 const char* emu_get_palette_name(uint8_t idx);
+const uint16_t* emu_get_palette_colors(uint8_t idx);
 
 // Save states
 bool emu_save_state(const char* rom_path);

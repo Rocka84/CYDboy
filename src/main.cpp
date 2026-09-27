@@ -10,6 +10,7 @@
 #include "serial_manager.h"
 #include "audio_output.h"
 #include "bgm_player.h"
+#include "cydboy_logo.h"
 //#include "wifi_upload.h"
 
 static RomEntry* roms = nullptr;
@@ -160,11 +161,17 @@ void setup() {
     bgm_init();
 
     // Splash
-    tft.fillScreen(TFT_BLACK); tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(0x07E0); tft.drawString("CYDboy",SCREEN_W/2,70,4);
-    tft.setTextColor(0x7BEF); tft.drawString("Game Boy Emulator",SCREEN_W/2,110,2);
+    tft.fillScreen(TFT_BLACK);
+    int logo_x = (SCREEN_W - CYDBOY_LOGO_W) / 2;
+    int logo_y = 110;
+    tft.pushImage(logo_x, logo_y, CYDBOY_LOGO_W, CYDBOY_LOGO_H, cydboy_logo_bitmap);
+
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(0x8D61); // DMG dot-matrix light green
+    tft.drawString("Game Boy / Color System", SCREEN_W / 2, logo_y + CYDBOY_LOGO_H + 22, 2);
+
     uint32_t splash_start = millis();
-    while (millis() - splash_start < 1200) {
+    while (millis() - splash_start < 800) {
         bt_controller_update();
         delay(20);
     }
@@ -213,7 +220,7 @@ void loop() {
     }
     if (sel == LAUNCHER_SEL_SETTINGS) {
         if (roms) { free(roms); roms = nullptr; }
-        launcher_settings_menu(&show_fps_overlay, &show_sd_save_overlay);
+        launcher_settings_menu(&show_fps_overlay, &show_sd_save_overlay, true);
         return;
     }
     // if (sel == LAUNCHER_SEL_WIFI_UPLOAD) {
