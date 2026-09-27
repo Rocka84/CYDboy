@@ -93,7 +93,9 @@ static void handle_list() {
         File f;
         while ((f = dir.openNextFile())) {
             if (f.isDirectory()) { f.close(); continue; }
-            String n = f.name();
+            String raw_name = f.name();
+            const char* slash = strrchr(raw_name.c_str(), '/');
+            String n = slash ? String(slash + 1) : raw_name;
             String lo = n; lo.toLowerCase();
             if (lo.endsWith(".gb") || lo.endsWith(".gbc")) {
                 if (!first) Serial.print(",");
@@ -127,6 +129,14 @@ static void handle_put(const String& args) {
     if (path.length() == 0 || size == 0) {
         Serial.println("CYD:ERR:invalid size or path");
         return;
+    }
+
+    if (!path.startsWith("/")) {
+        if (path.endsWith(".gbc") || path.endsWith(".GBC")) {
+            path = String(ROM_PATH_GBC) + "/" + path;
+        } else {
+            path = String(ROM_PATH_GB) + "/" + path;
+        }
     }
 
     if (path.startsWith("/roms/gb/") && !SD.exists(ROM_PATH_GB)) SD.mkdir(ROM_PATH_GB);
@@ -167,7 +177,7 @@ static void handle_put(const String& args) {
                 }
             }
         }
-        if (millis() - last_activity > 5000) {
+        if (millis() - last_activity > 8000) {
             f.close();
             SD.remove(path.c_str());
             Serial.println("CYD:ERR:receive timeout");
@@ -189,6 +199,12 @@ static void handle_del(const String& path) {
     if (p.length() == 0) {
         Serial.println("CYD:ERR:missing path");
         return;
+    }
+    if (!p.startsWith("/")) {
+        String p_gb = String(ROM_PATH_GB) + "/" + p;
+        String p_gbc = String(ROM_PATH_GBC) + "/" + p;
+        if (SD.exists(p_gb.c_str())) p = p_gb;
+        else if (SD.exists(p_gbc.c_str())) p = p_gbc;
     }
     if (SD.exists(p.c_str())) {
         if (SD.remove(p.c_str())) Serial.println("CYD:OK");
@@ -218,7 +234,7 @@ bool serial_manager_check_handshake() {
         if (c == '\r') continue;
         if (c == '\n') {
             handshake_buf.trim();
-            if (handshake_buf.startsWith("CYD:PING") || handshake_buf.startsWith("CYD:")) {
+            if (handshake_buf.startsWith("CYD:PING") || handshake_buf.startsWith("CYD:") || handshake_buf == "PING") {
                 handshake_buf = "";
                 return true;
             }
@@ -259,12 +275,12 @@ void serial_manager_run() {
             if (c == '\r') continue;
             if (c == '\n') {
                 cmd.trim();
-                if (cmd.startsWith("CYD:PING")) {
+                if (cmd.startsWith("CYD:PING") || cmd == "PING") {
                     Serial.println("CYD:PONG:CYD-GB:v1.0");
                     draw_usb_ui("Web Tool Connected");
-                } else if (cmd.startsWith("CYD:INFO")) {
+                } else if (cmd.startsWith("CYD:INFO") || cmd == "INFO") {
                     handle_info();
-                } else if (cmd.startsWith("CYD:LIST")) {
+                } else if (cmd.startsWith("CYD:LIST") || cmd == "LIST") {
                     handle_list();
                 } else if (cmd.startsWith("CYD:PUT ")) {
                     handle_put(cmd.substring(8));
@@ -272,7 +288,7 @@ void serial_manager_run() {
                     handle_del(cmd.substring(8));
                 } else if (cmd.startsWith("CYD:BAUD ")) {
                     handle_baud(cmd.substring(9));
-                } else if (cmd.startsWith("CYD:EXIT")) {
+                } else if (cmd.startsWith("CYD:EXIT") || cmd == "EXIT") {
                     Serial.println("CYD:OK");
                     running = false;
                     break;

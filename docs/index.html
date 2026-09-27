@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CYDboy — Game Boy &amp; GBC on ESP32 Cheap Yellow Display</title>
-  <meta name="description" content="High-performance Game Boy and Game Boy Color emulator for the ESP32 Cheap Yellow Display with 1-click Web Flasher and SD ROM Manager.">
+  <meta name="description" content="Game Boy and Game Boy Color emulator for the ESP32 Cheap Yellow Display with Web Flasher and SD ROM Manager.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -410,7 +410,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── Flasher Card & 1-Click Action ──────────────────────────────── */
+    /* ─── Flasher Card & Action ──────────────────────────────────────── */
     .flasher-hero-card {
       background: linear-gradient(145deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%);
       border: 1px solid var(--border-light);
@@ -925,7 +925,7 @@
     </div>
     <h1>Play Game Boy &amp; Game Boy Color on the Cheap Yellow Display</h1>
     <p class="hero-desc">
-      An enhanced, high-performance Game Boy &amp; GBC emulator for the ESP32 Cheap Yellow Display, featuring Walnut-CGB, direct SD FAT32 cluster streaming, Bluetooth gamepads, true save states, and instant 1-click web flashing.
+      An enhanced Game Boy &amp; GBC emulator for the ESP32 Cheap Yellow Display, featuring Walnut-CGB, direct SD FAT32 cluster streaming, Bluetooth gamepads, true save states, and easy web flashing.
     </p>
 
     <div class="hero-tags">
@@ -933,14 +933,14 @@
       <span class="pill-tag">🚀 50+ FPS Direct SD Streaming</span>
       <span class="pill-tag">📡 Bluetooth Gamepads</span>
       <span class="pill-tag">💾 True Save States</span>
-      <span class="pill-tag">🔊 10-bit PWM Audio &amp; BGM</span>
+      <span class="pill-tag">🔊 10-bit PWM Audio</span>
       <span class="pill-tag">⚡ No PSRAM Required</span>
       <span class="pill-tag">📺 Pixel-accurate 10:9 Display</span>
     </div>
 
     <div class="hero-actions">
       <a href="#tools" onclick="switchTab('flasher')" class="btn-hero-primary">
-        ⚡ 1-Click Web Flasher
+        ⚡ Web Flasher
       </a>
       <a href="#tools" onclick="switchTab('roms')" class="btn-hero-secondary">
         📁 Manage SD ROMs
@@ -974,8 +974,8 @@
           <div class="feature-icon-badge">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
           </div>
-          <h3>10-bit PWM Audio &amp; Menu BGM</h3>
-          <p>High-resolution 10-bit PWM audio (78.1 kHz carrier) on GPIO 26 via onboard SC8002B amplifier. Real-time 4-channel Game Boy APU synthesis, SD menu music streaming (/bgm.wav), and instant runtime toggle (OFF / LOW / MED / HIGH) with full save state compatibility.</p>
+          <h3>10-bit PWM Audio</h3>
+          <p>High-resolution 10-bit PWM audio (78.1 kHz carrier) on GPIO 26 via onboard SC8002B amplifier. Real-time 4-channel Game Boy APU synthesis and instant runtime toggle (OFF / LOW / MED / HIGH) with full save state compatibility.</p>
         </div>
 
         <div class="feature-card">
@@ -1024,14 +1024,14 @@
     <section class="tools-section" id="tools">
       <div class="tab-bar">
         <button class="tab-btn active" id="tabBtnFlasher" onclick="switchTab('flasher')">
-          ⚡ 1-Click Web Flasher
+          ⚡ Web Flasher
         </button>
         <button class="tab-btn" id="tabBtnRoms" onclick="switchTab('roms')">
           📁 SD ROM Manager
         </button>
       </div>
 
-      <!-- TAB 1: 1-CLICK WEB FLASHER -->
+      <!-- TAB 1: WEB FLASHER -->
       <div class="tab-content active" id="tabFlasher">
         <div class="flasher-hero-card">
           <div class="flasher-info">
@@ -1187,8 +1187,7 @@
           <p style="margin-top: 8px;">
             <code>/roms/gb/</code> &nbsp;Classic (.gb)<br>
             <code>/roms/gbc/</code> &nbsp;Color (.gbc)<br>
-            <code>/saves/</code> &nbsp;Saves &amp; States<br>
-            <code>/bgm.wav</code> &nbsp;Optional menu music
+            <code>/saves/</code> &nbsp;Saves &amp; States
           </p>
         </div>
 
@@ -1206,7 +1205,7 @@
   <footer>
     <div class="footer-content">
       <div class="footer-left">
-        <strong>CYDboy</strong> — High-Performance Game Boy &amp; GBC on ESP32
+        <strong>CYDboy</strong> — Game Boy &amp; GBC on ESP32
         <p>
           Forked with ❤️ from <a href="https://github.com/artanergin44-collab/cyd-gb" target="_blank" rel="noopener">artanergin44-collab/cyd-gb</a>.<br>
           Maintained by <a href="https://github.com/Rocka84/cydboy" target="_blank" rel="noopener">Rocka84/cydboy</a>. Open-source under the MIT License.
@@ -1224,10 +1223,60 @@
     </div>
   </footer>
 
+  <!-- Buffer polyfill for esptool-js base64 stub decoding in browser -->
+  <script>
+    if (typeof window.Buffer === 'undefined') {
+      window.Buffer = {
+        from: function(data, encoding) {
+          if (encoding === 'base64') {
+            const binary = atob(data);
+            return {
+              toString: function(enc) { return binary; }
+            };
+          }
+          return {
+            toString: function() { return String(data); }
+          };
+        }
+      };
+    }
+  </script>
+
   <!-- Load esptool-js bundle for Chrome WebSerial flashing -->
-  <script src="https://unpkg.com/esptool-js@0.4.3/bundle.js"></script>
+  <script type="module">
+    try {
+      const { ESPLoader, Transport } = await import('./esptool-bundle.js');
+      window.ESPLoader = ESPLoader;
+      window.Transport = Transport;
+    } catch (e) {
+      try {
+        const { ESPLoader, Transport } = await import('https://unpkg.com/esptool-js@0.4.3/bundle.js');
+        window.ESPLoader = ESPLoader;
+        window.Transport = Transport;
+      } catch (err) {
+        console.error('Failed to load esptool-js module:', err);
+      }
+    }
+  </script>
 
   <script>
+    async function getEsptool() {
+      if (window.ESPLoader && window.Transport) {
+        return { ESPLoader: window.ESPLoader, Transport: window.Transport };
+      }
+      try {
+        const mod = await import('./esptool-bundle.js');
+        window.ESPLoader = mod.ESPLoader;
+        window.Transport = mod.Transport;
+        return mod;
+      } catch (e) {
+        const mod = await import('https://unpkg.com/esptool-js@0.4.3/bundle.js');
+        window.ESPLoader = mod.ESPLoader;
+        window.Transport = mod.Transport;
+        return mod;
+      }
+    }
+
     // ─── Metadata Loader ───────────────────────────────────────────────────
     async function loadFirmwareInfo() {
       try {
@@ -1284,10 +1333,14 @@
       }
     }
 
-    // ─── 1-CLICK ESPTOOL-JS FLASHER ───────────────────────────────────────
+    // ─── WEB FLASHER (ESPTOOL-JS) ─────────────────────────────────────────
     async function startOneClickFlashing() {
       if (!navigator.serial) {
-        alert('Web Serial is only supported in Google Chrome, Microsoft Edge, and Chromium-based browsers.');
+        if (!window.isSecureContext || location.protocol === 'file:') {
+          alert('Web Serial requires a secure context (localhost or HTTPS).\n\nYou opened: ' + (location.origin || location.href) + '\n\nPlease run a local server and access via http://localhost:8000 (or http://127.0.0.1:8000), not via file:// or a local IP address.');
+        } else {
+          alert('Web Serial is only supported in desktop Google Chrome, Microsoft Edge, and Chromium-based browsers.');
+        }
         return;
       }
 
@@ -1297,8 +1350,17 @@
       const progressText = document.getElementById('flasherProgressText');
       const progressStatus = document.getElementById('flasherProgressStatus');
 
+      let transport = null;
+
       try {
         flashBtn.disabled = true;
+        appendLog('flasherTerminal', 'Initializing esptool-js flasher...', 'info');
+
+        const { ESPLoader, Transport } = await getEsptool();
+        if (!ESPLoader || !Transport) {
+          throw new Error('Failed to load esptool-js flasher engine.');
+        }
+
         appendLog('flasherTerminal', 'Fetching official CYDboy firmware.bin...', 'info');
 
         // Fetch firmware.bin directly from the site
@@ -1325,8 +1387,9 @@
         progressBar.style.width = '5%';
         progressText.textContent = 'Connecting...';
 
-        const esploader = new window.esptooljs.ESPLoader({
-          port: port,
+        transport = new Transport(port);
+        const esploader = new ESPLoader({
+          transport: transport,
           baudrate: 921600,
           terminal: {
             clean() {},
@@ -1335,8 +1398,9 @@
           }
         });
 
-        await esploader.main();
-        appendLog('flasherTerminal', `Connected: ${esploader.chip.CHIP_NAME}`, 'success');
+        const chipDesc = await esploader.main();
+        const chipName = (esploader.chip && esploader.chip.CHIP_NAME) || chipDesc || 'ESP32';
+        appendLog('flasherTerminal', `Connected: ${chipName}`, 'success');
 
         const fileArray = [{
           data: firmwareBinary,
@@ -1363,12 +1427,27 @@
         progressBar.style.width = '100%';
         progressText.textContent = '100%';
 
-        await esploader.after();
-        await port.close();
+        try {
+          await esploader.flashFinish();
+          await esploader.hardReset();
+        } catch (e) {
+          console.warn('Reset note:', e);
+        }
+
+        try {
+          await transport.disconnect();
+          transport = null;
+        } catch (e) {
+          console.warn('Disconnect note:', e);
+        }
 
         alert('🎉 CYDboy firmware flashed successfully!\n\nYour ESP32 Cheap Yellow Display is now rebooting.');
       } catch (err) {
         appendLog('flasherTerminal', 'Error: ' + err.message, 'error');
+        if (transport) {
+          try { await transport.disconnect(); } catch (_) {}
+          transport = null;
+        }
         alert('Flashing error: ' + err.message);
       } finally {
         flashBtn.disabled = false;
@@ -1400,9 +1479,28 @@
       });
     }
 
+    function sendRawString(str) {
+      if (!romWriter) throw new Error('Not connected');
+      const encoder = new TextEncoder();
+      return romWriter.write(encoder.encode(str));
+    }
+
+    function sendSerialCommand(cmd, expectPrefix = 'CYD:', timeoutMs = 6000) {
+      appendLog('romTerminal', '-> ' + cmd);
+      const promise = waitForCondition(
+        line => line.startsWith(expectPrefix) || line.startsWith('CYD:ERR'),
+        timeoutMs
+      );
+      return sendRawString(cmd + '\n').then(() => promise);
+    }
+
     async function connectRomSerial() {
       if (!navigator.serial) {
-        alert('Web Serial is only supported in Google Chrome, Microsoft Edge, and Chromium browsers.');
+        if (!window.isSecureContext || location.protocol === 'file:') {
+          alert('Web Serial requires a secure context (localhost or HTTPS).\n\nYou opened: ' + (location.origin || location.href) + '\n\nPlease run a local server and access via http://localhost:8000 (or http://127.0.0.1:8000), not via file:// or a local IP address.');
+        } else {
+          alert('Web Serial is only supported in desktop Google Chrome, Microsoft Edge, and Chromium browsers.');
+        }
         return;
       }
 
@@ -1415,19 +1513,51 @@
         romPort = await navigator.serial.requestPort();
         await romPort.open({ baudRate: 115200 });
 
+        try {
+          await romPort.setSignals({ dataTerminalReady: false, requestToSend: false });
+        } catch (e) {}
+
         romWriter = romPort.writable.getWriter();
         romReader = romPort.readable.getReader();
         romReadLoopActive = true;
+        incomingLineBuffer = '';
         startRomReadLoop();
 
         document.getElementById('romStatusDot').classList.add('connected');
+        document.getElementById('romStatusText').textContent = 'Connecting...';
+        appendLog('romTerminal', 'Port opened. Searching for CYD-GB...', 'info');
+
+        // Handshake retry loop (waits up to 8 seconds, handles reboot/splash screen delay)
+        let connected = false;
+        const handshakeStart = Date.now();
+
+        while (Date.now() - handshakeStart < 8000) {
+          try {
+            const pongPromise = waitForCondition(line => line.startsWith('CYD:PONG'), 600);
+            await sendRawString('CYD:PING\n');
+            const resp = await pongPromise;
+            if (resp) {
+              connected = true;
+              break;
+            }
+          } catch (e) {
+            // Retry
+          }
+          await new Promise(r => setTimeout(r, 200));
+        }
+
+        if (!connected) {
+          throw new Error('No reply from CYD-GB. Make sure your CYD is on the launcher screen or select "USB ROM Manager" in Settings.');
+        }
+
         document.getElementById('romStatusText').textContent = 'Connected (115200)';
-        document.getElementById('btnRomConnect').innerHTML = '<span>Disconnect USB</span>';
+        document.getElementById('btnRomConnect').innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <span>Disconnect USB</span>`;
         document.getElementById('btnRefreshRoms').disabled = false;
 
-        appendLog('romTerminal', 'Connected to CYD serial port', 'success');
+        appendLog('romTerminal', 'CYD-GB connected successfully!', 'success');
 
-        await sendRomCommand('PING');
         await loadStorageInfo();
         await loadRomList();
       } catch (err) {
@@ -1438,18 +1568,35 @@
 
     async function disconnectRomSerial() {
       romReadLoopActive = false;
-      if (romReader) {
-        try { await romReader.cancel(); } catch(e) {}
-        romReader.releaseLock();
-        romReader = null;
+      if (responseResolver) {
+        responseResolver = null;
       }
       if (romWriter) {
-        try { await romWriter.close(); } catch(e) {}
-        romWriter.releaseLock();
+        try {
+          const encoder = new TextEncoder();
+          await romWriter.write(encoder.encode('CYD:EXIT\n'));
+        } catch (e) {}
+        try {
+          await romWriter.close();
+        } catch (e) {}
+        try {
+          romWriter.releaseLock();
+        } catch (e) {}
         romWriter = null;
       }
+      if (romReader) {
+        try {
+          await romReader.cancel();
+        } catch (e) {}
+        try {
+          romReader.releaseLock();
+        } catch (e) {}
+        romReader = null;
+      }
       if (romPort) {
-        try { await romPort.close(); } catch(e) {}
+        try {
+          await romPort.close();
+        } catch (e) {}
         romPort = null;
       }
 
@@ -1459,6 +1606,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
         <span>Connect CYD USB</span>`;
       document.getElementById('btnRefreshRoms').disabled = true;
+      appendLog('romTerminal', 'Disconnected.', 'info');
     }
 
     async function startRomReadLoop() {
@@ -1468,7 +1616,7 @@
           const { value, done } = await romReader.read();
           if (done) break;
           if (value) {
-            const chunk = decoder.decode(value);
+            const chunk = decoder.decode(value, { stream: true });
             incomingLineBuffer += chunk;
             let lines = incomingLineBuffer.split('\n');
             incomingLineBuffer = lines.pop();
@@ -1476,7 +1624,7 @@
             for (const rawLine of lines) {
               const line = rawLine.trim();
               if (line) {
-                appendLog('romTerminal', line);
+                appendLog('romTerminal', '<- ' + line);
                 if (responseResolver) responseResolver(line);
               }
             }
@@ -1487,61 +1635,37 @@
       }
     }
 
-    async function sendRomCommand(cmd) {
-      if (!romWriter) throw new Error('Not connected');
-      const encoder = new TextEncoder();
-      await romWriter.write(encoder.encode(cmd + '\n'));
-    }
-
     async function loadStorageInfo() {
       try {
-        const promise = waitForCondition(l => l.startsWith('INFO:') || l.startsWith('ERR:'));
-        await sendRomCommand('INFO');
-        const res = await promise;
-        if (res.startsWith('INFO:')) {
-          const parts = res.substring(5).split(',');
-          const totalMB = parseInt(parts[0]);
-          const usedMB = parseInt(parts[1]);
-          const freeMB = totalMB - usedMB;
-          const pct = Math.round((usedMB / totalMB) * 100);
+        const res = await sendSerialCommand('CYD:INFO', 'CYD:INFO:');
+        if (res.startsWith('CYD:INFO:')) {
+          const info = JSON.parse(res.substring(9));
+          const totalMB = Math.round(Number(info.total) / (1024 * 1024));
+          const usedMB = Math.round(Number(info.used) / (1024 * 1024));
+          const freeMB = Math.round(Number(info.free) / (1024 * 1024));
+          const pct = totalMB > 0 ? Math.min(100, Math.max(0, Math.round((usedMB / totalMB) * 100))) : 0;
 
           document.getElementById('storageBar').style.width = pct + '%';
           document.getElementById('storageLabel').textContent = `${usedMB} MB used of ${totalMB} MB (${freeMB} MB free)`;
         }
       } catch (e) {
-        appendLog('romTerminal', 'Could not read SD capacity', 'error');
+        appendLog('romTerminal', 'Could not read SD capacity: ' + e.message, 'error');
       }
     }
 
     async function loadRomList() {
       try {
-        const roms = [];
-        let listActive = false;
+        appendLog('romTerminal', 'Fetching ROM list...', 'info');
+        const res = await sendSerialCommand('CYD:LIST', 'CYD:LIST:');
+        if (!res.startsWith('CYD:LIST:')) {
+          throw new Error('Device error: ' + res);
+        }
 
-        const romPromise = new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Timeout loading ROM list')), 6000);
-          responseResolver = (line) => {
-            if (line === 'LIST_START') {
-              listActive = true;
-              roms.length = 0;
-            } else if (line === 'LIST_END') {
-              clearTimeout(timer);
-              responseResolver = null;
-              resolve(roms);
-            } else if (listActive && line.startsWith('ROM:')) {
-              const parts = line.substring(4).split(',');
-              roms.push({ name: parts[0], size: parseInt(parts[1]) });
-            }
-          };
-        });
-
-        await sendRomCommand('LIST');
-        await romPromise;
-
+        const roms = JSON.parse(res.substring(9));
         const tbody = document.getElementById('romTableBody');
         tbody.innerHTML = '';
 
-        if (roms.length === 0) {
+        if (!roms || roms.length === 0) {
           tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 24px;">No ROMs found in /roms/ directory.</td></tr>';
           return;
         }
@@ -1550,7 +1674,7 @@
 
         roms.forEach(rom => {
           const tr = document.createElement('tr');
-          const isGBC = rom.name.toLowerCase().endsWith('.gbc');
+          const isGBC = rom.is_gbc || rom.name.toLowerCase().endsWith('.gbc');
           const badgeClass = isGBC ? 'badge-gbc' : 'badge-gb';
           const badgeText = isGBC ? 'GBC' : 'GB';
           const sizeKb = (rom.size / 1024).toFixed(0);
@@ -1560,7 +1684,7 @@
             <td><strong>${escapeHtml(rom.name)}</strong></td>
             <td style="font-family: var(--font-mono); color: var(--text-dim);">${sizeKb} KB</td>
             <td style="text-align: right;">
-              <button class="btn btn-danger btn-sm" onclick="deleteRom('${escapeHtml(rom.name)}')">Delete</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteRom('${escapeHtml(rom.path)}', '${escapeHtml(rom.name)}')">Delete</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -1570,15 +1694,18 @@
       }
     }
 
-    async function deleteRom(filename) {
-      if (!confirm(`Are you sure you want to delete ${filename} from your MicroSD card?`)) return;
+    async function deleteRom(path, name) {
+      if (!confirm(`Are you sure you want to delete "${name}" from your MicroSD card?`)) return;
       try {
-        const promise = waitForCondition(l => l.startsWith('OK:DEL') || l.startsWith('ERR:'));
-        await sendRomCommand(`DEL:${filename}`);
-        await promise;
-        appendLog('romTerminal', `Deleted ${filename}`, 'success');
-        await loadRomList();
-        await loadStorageInfo();
+        appendLog('romTerminal', `Deleting "${name}"...`, 'info');
+        const res = await sendSerialCommand(`CYD:DEL ${path}`, 'CYD:OK');
+        if (res.startsWith('CYD:OK')) {
+          appendLog('romTerminal', `Deleted "${name}"`, 'success');
+          await loadRomList();
+          await loadStorageInfo();
+        } else {
+          alert('Could not delete ROM: ' + res);
+        }
       } catch (err) {
         alert('Could not delete ROM: ' + err.message);
       }
@@ -1602,7 +1729,7 @@
     }
 
     async function uploadRomFiles(files) {
-      if (!romPort) {
+      if (!romPort || !romWriter) {
         alert('Please connect to your CYD first via "Connect CYD USB".');
         return;
       }
@@ -1620,34 +1747,46 @@
           continue;
         }
 
+        const isGbc = file.name.toLowerCase().endsWith('.gbc');
+        const targetDir = isGbc ? '/roms/gbc' : '/roms/gb';
+        const targetPath = `${targetDir}/${file.name}`;
+
         try {
           progressStatus.textContent = `Uploading ${file.name} (${i + 1}/${files.length})...`;
-          appendLog('romTerminal', `Starting upload for: ${file.name}`, 'info');
+          appendLog('romTerminal', `Starting upload: "${file.name}" (${file.size} bytes) -> ${targetPath}`, 'info');
 
           // Initialize transfer on ESP32
-          const initPromise = waitForCondition(l => l.startsWith('OK:UPLOAD') || l.startsWith('ERR:'));
-          await sendRomCommand(`UPLOAD:${file.name}:${file.size}`);
-          await initPromise;
+          const readyResp = await sendSerialCommand(`CYD:PUT ${targetPath} ${file.size}`, 'CYD:READY', 8000);
+          if (!readyResp.startsWith('CYD:READY')) {
+            throw new Error('Device not ready: ' + readyResp);
+          }
 
           const buffer = await file.arrayBuffer();
           const bytes = new Uint8Array(buffer);
           const chunkSize = 512;
+          let sent = 0;
 
-          for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-            const end = Math.min(offset + chunkSize, bytes.length);
-            const chunk = bytes.slice(offset, end);
-
-            // Chunk ACK handshake
-            const chunkPromise = waitForCondition(l => l === 'ACK' || l.startsWith('ERR:'));
+          while (sent < bytes.length) {
+            const end = Math.min(sent + chunkSize, bytes.length);
+            const chunk = bytes.subarray(sent, end);
             await romWriter.write(chunk);
-            await chunkPromise;
+            sent += chunk.length;
 
-            const pct = Math.round((end / bytes.length) * 100);
+            const pct = Math.round((sent / bytes.length) * 100);
             progressBar.style.width = pct + '%';
-            progressText.textContent = `${pct}% (${(end / 1024).toFixed(0)} / ${(bytes.length / 1024).toFixed(0)} KB)`;
+            progressText.textContent = `${pct}% (${(sent / 1024).toFixed(0)} / ${(bytes.length / 1024).toFixed(0)} KB)`;
+            await new Promise(r => setTimeout(r, 6));
           }
 
-          appendLog('romTerminal', `Upload completed: ${file.name}`, 'success');
+          // Wait for confirmation from device after write & SD flush
+          appendLog('romTerminal', 'Waiting for SD card flush & confirmation...', 'info');
+          const confirm = await waitForCondition(l => l.startsWith('CYD:OK') || l.startsWith('CYD:ERR'), 15000);
+
+          if (confirm.startsWith('CYD:OK')) {
+            appendLog('romTerminal', `Successfully uploaded "${file.name}"!`, 'success');
+          } else {
+            throw new Error('Device returned: ' + confirm);
+          }
         } catch (err) {
           appendLog('romTerminal', `Upload failed for ${file.name}: ` + err.message, 'error');
           alert(`Upload failed for ${file.name}: ${err.message}`);

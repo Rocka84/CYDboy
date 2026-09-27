@@ -1,10 +1,10 @@
 {
   "project": "CYDboy",
   "version": "v1.1",
-  "build_date": "2026-09-27 02:40",
-  "timestamp": "20260927_024021",
-  "size_bytes": 935664,
-  "size_kb": 913.7,
+  "build_date": "2026-09-27 02:50",
+  "timestamp": "20260927_025047",
+  "size_bytes": 936912,
+  "size_kb": 915.0,
   "board": "ESP32-2432S028R",
   "features": [
     "Game Boy & Game Boy Color (Walnut-CGB)",
