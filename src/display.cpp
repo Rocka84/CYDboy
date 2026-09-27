@@ -38,7 +38,7 @@ void display_set_backlight(uint8_t level) {
 void display_clear(uint16_t color) { tft.fillScreen(color); }
 
 // Game scanline -> top 216px (1.5x horiz, 1.5x vert)
-void display_push_gb_line(uint8_t y, const uint8_t* px, const uint16_t* pal, uint8_t mask) {
+void IRAM_ATTR display_push_gb_line(uint8_t y, const uint8_t* px, const uint16_t* pal, uint8_t mask) {
     if (y >= GB_SCREEN_H) return;
 
     for (int x = 0, idx = 0; x < GB_SCREEN_W; x += 2) {

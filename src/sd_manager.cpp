@@ -9,14 +9,16 @@ static bool ready = false;
 
 bool sd_init() {
     sdSPI.begin(SD_PIN_SCK, SD_PIN_MISO, SD_PIN_MOSI, SD_PIN_CS);
-    if(!SD.begin(SD_PIN_CS, sdSPI, 40000000)){
-        if(!SD.begin(SD_PIN_CS, sdSPI, 25000000)){
+    uint32_t freq = 40000000;
+    if(!SD.begin(SD_PIN_CS, sdSPI, freq)){
+        freq = 25000000;
+        if(!SD.begin(SD_PIN_CS, sdSPI, freq)){
             Serial.println("[SD] Mount fail!");
             return false;
         }
     }
 
-    Serial.printf("[SD] Type:%d Size:%lluMB\n",SD.cardType(),SD.cardSize()/(1024*1024));
+    Serial.printf("[SD] Mount OK @ %u MHz. Type:%d Size:%lluMB\n", freq / 1000000, SD.cardType(), SD.cardSize()/(1024*1024));
     if(!SD.exists(ROM_PATH_GB)) SD.mkdir(ROM_PATH_GB);
     if(!SD.exists(ROM_PATH_GBC)) SD.mkdir(ROM_PATH_GBC);
     if(!SD.exists(SAVE_PATH)) SD.mkdir(SAVE_PATH);

@@ -22,15 +22,21 @@
 #include "walnut_cgb.h"
 
 #include <ff.h>
+#include <diskio.h>
+DRESULT ff_sd_read(uint8_t pdrv, uint8_t* buffer, DWORD sector, UINT count);
 
 // ─── Page cache & Extent mapping ───────────────────────────────────────────
 #define PG_SZ 512
 #define PG_SHIFT 9
 #define PG_N  160
-#define PG_LOCKED 2
 #define PG_MASK (PG_SZ-1)
 #define HASH_SZ 512
 #define HASH_M (HASH_SZ-1)
+#define BANK0_PIN_SZ 4096
+
+static uint8_t* bank0 = nullptr;
+static uint8_t* pg_pool = nullptr;
+static int npg_pool = 0;
 
 struct RomExtent {
     uint32_t file_sec;
@@ -42,12 +48,11 @@ static RomExtent extents[MAX_EXTENTS];
 static int num_extents = 0;
 
 static inline uint32_t IRAM_ATTR offset_to_disk_sector(uint32_t pb) {
+    uint32_t fsec = pb >> PG_SHIFT;
     if (num_extents == 1) {
-        uint32_t fsec = pb >> PG_SHIFT;
         if (fsec < extents[0].count) return extents[0].disk_sec + fsec;
         return 0;
     }
-    uint32_t fsec = pb >> PG_SHIFT;
     for (int e = 0; e < num_extents; e++) {
         if (fsec >= extents[e].file_sec && fsec < extents[e].file_sec + extents[e].count) {
             return extents[e].disk_sec + (fsec - extents[e].file_sec);
@@ -96,9 +101,9 @@ static inline uint8_t* IRAM_ATTR cget(uint32_t a) {
             return &pg[j].d[a & PG_MASK];
         }
     }
-    int lru = PG_LOCKED;
+    int lru = 0;
     uint32_t old = UINT32_MAX;
-    for (int j = PG_LOCKED; j < npg; j++) {
+    for (int j = 0; j < npg; j++) {
         if (!pg[j].v) { lru = j; break; }
         if (pg[j].acc < old) { old = pg[j].acc; lru = j; }
     }
@@ -110,7 +115,7 @@ static inline uint8_t* IRAM_ATTR cget(uint32_t a) {
     uint32_t sec = offset_to_disk_sector(pb);
     bool ok = false;
     if (sec != 0) {
-        ok = SD.readRAW(pg[lru].d, sec);
+        ok = (ff_sd_read(0, pg[lru].d, sec, PG_SZ / 512) == RES_OK);
     }
     if (!ok) {
         if (romf_pos != pb) {
@@ -185,12 +190,16 @@ const uint16_t* emu_get_palette_colors(uint8_t i) { return (i<NUM_PALETTES)?pals
 // ─── Callbacks ──────────────────────────────────────────────────────────────
 static uint8_t IRAM_ATTR gb_rom_read(struct gb_s* g, const uint_fast32_t a) {
     (void)g;
+    if (a < BANK0_PIN_SZ && bank0) return bank0[a];
     if (a >= romlen) return 0xFF;
     return *cget(a);
 }
 
 static uint16_t IRAM_ATTR gb_rom_read_16bit(struct gb_s* g, const uint_fast32_t a) {
     (void)g;
+    if (a + 1 < BANK0_PIN_SZ && bank0) {
+        return (uint16_t)bank0[a] | ((uint16_t)bank0[a + 1] << 8);
+    }
     if (a + 1 < romlen && (a & PG_MASK) < PG_MASK) {
         uint8_t* p = cget(a);
         return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
@@ -200,6 +209,12 @@ static uint16_t IRAM_ATTR gb_rom_read_16bit(struct gb_s* g, const uint_fast32_t 
 
 static uint32_t IRAM_ATTR gb_rom_read_32bit(struct gb_s* g, const uint_fast32_t a) {
     (void)g;
+    if (a + 3 < BANK0_PIN_SZ && bank0) {
+        return (uint32_t)bank0[a] |
+               ((uint32_t)bank0[a + 1] << 8) |
+               ((uint32_t)bank0[a + 2] << 16) |
+               ((uint32_t)bank0[a + 3] << 24);
+    }
     if (a + 3 < romlen && (a & PG_MASK) <= PG_SZ - 4) {
         uint8_t* p = cget(a);
         return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
@@ -315,7 +330,7 @@ bool emu_open_rom(const char* path) {
             num_extents = 0;
         } else {
             uint8_t tbuf[512];
-            if (SD.readRAW(tbuf, extents[0].disk_sec)) {
+            if (ff_sd_read(0, tbuf, extents[0].disk_sec, 1) == RES_OK) {
                 Serial.printf("[EMU] Verify start sector %u: logo[0]=0x%02X logo[1]=0x%02X\n",
                               (unsigned)extents[0].disk_sec, tbuf[0x104], tbuf[0x105]);
                 if (tbuf[0x104] != 0xCE || tbuf[0x105] != 0xED) {
@@ -343,11 +358,17 @@ void emu_close_rom() {
     s_last_pb = UINT32_MAX;
     s_last_d = nullptr;
     s_last_i = -1;
+    if (bank0) { free(bank0); bank0 = nullptr; }
     for (int i = 0; i < PG_N; i++) {
-        if (pg[i].d) { free(pg[i].d); pg[i].d = nullptr; }
+        if (pg[i].d && (pg_pool == nullptr || pg[i].d < pg_pool || pg[i].d >= pg_pool + (npg_pool * PG_SZ))) {
+            free(pg[i].d);
+        }
+        pg[i].d = nullptr;
         pg[i].v = false;
     }
+    if (pg_pool) { free(pg_pool); pg_pool = nullptr; }
     npg = 0;
+    npg_pool = 0;
     if (cram) { free(cram); cram = nullptr; cram_sz = 0; }
     if (gb) { free(gb); gb = nullptr; }
     Serial.printf("[EMU] Closed. Free heap: %u\n", ESP.getFreeHeap());
@@ -386,7 +407,7 @@ bool emu_init(uint8_t*, uint32_t) {
         req_ram = 512;
     } else {
         if (rc == 1) req_ram = 2048;
-        else if (rc >= 2) req_ram = 8192; // 8KB is plenty for saves and frees 24KB for ROM page cache
+        else if (rc >= 2) req_ram = 8192;
     }
 
     if (req_ram > 0) {
@@ -406,22 +427,76 @@ bool emu_init(uint8_t*, uint32_t) {
         cram_sz = 0;
     }
 
-    memset(ht, -1, sizeof(ht));
-
-    for (int i = 0; i < PG_N; i++) {
-        if (pg[i].d) { free(pg[i].d); pg[i].d = nullptr; }
-        pg[i].v = false;
+    // 1. Permanently lock Bank 0 low 4 KB in RAM
+    if (!bank0) bank0 = (uint8_t*)malloc(BANK0_PIN_SZ);
+    if (bank0) {
+        memset(bank0, 0xFF, BANK0_PIN_SZ);
+        uint32_t load_len = min((uint32_t)BANK0_PIN_SZ, romlen);
+        for (uint32_t pb = 0; pb < load_len; pb += PG_SZ) {
+            uint32_t sec = offset_to_disk_sector(pb);
+            bool ok = false;
+            if (sec != 0) {
+                ok = (ff_sd_read(0, bank0 + pb, sec, 1) == RES_OK);
+            }
+            if (!ok) {
+                romf.seek(pb);
+                romf.read(bank0 + pb, min((uint32_t)PG_SZ, load_len - pb));
+            }
+        }
+        romf_pos = UINT32_MAX;
+        Serial.printf("[EMU] Bank 0 pinned (4 KB). Free heap: %u\n", ESP.getFreeHeap());
     }
-    npg = 0;
 
+    // 2. Allocate contiguous page pool for switchable banks
+    memset(ht, -1, sizeof(ht));
     for (int i = 0; i < PG_N; i++) {
-        if (ESP.getMaxAllocHeap() < PG_SZ || ESP.getFreeHeap() < 7168) break;
-        pg[i].d = (uint8_t*)malloc(PG_SZ);
-        if (!pg[i].d) break;
+        if (pg[i].d && (pg_pool == nullptr || pg[i].d < pg_pool || pg[i].d >= pg_pool + (npg_pool * PG_SZ))) {
+            free(pg[i].d);
+        }
+        pg[i].d = nullptr;
         pg[i].v = false;
         pg[i].acc = 0;
+    }
+    if (pg_pool) { free(pg_pool); pg_pool = nullptr; }
+    npg = 0;
+    npg_pool = 0;
+
+    size_t free_h = ESP.getFreeHeap();
+    size_t reserve = 6144;
+    size_t pool_bytes = 0;
+    if (free_h > reserve + (2 * PG_SZ)) {
+        pool_bytes = free_h - reserve;
+        if (pool_bytes > (PG_N * PG_SZ)) pool_bytes = PG_N * PG_SZ;
+        if (pool_bytes > ESP.getMaxAllocHeap()) pool_bytes = ESP.getMaxAllocHeap();
+        pool_bytes &= ~(PG_SZ - 1);
+    }
+
+    if (pool_bytes >= 2 * PG_SZ) {
+        pg_pool = (uint8_t*)malloc(pool_bytes);
+    }
+
+    if (pg_pool) {
+        npg_pool = pool_bytes / PG_SZ;
+        for (int i = 0; i < npg_pool; i++) {
+            pg[i].d = pg_pool + (i * PG_SZ);
+            pg[i].v = false;
+            pg[i].acc = 0;
+        }
+        npg = npg_pool;
+    }
+
+    // Allocate additional individual pages from remaining fragmented heap until reserve
+    while (npg < PG_N && ESP.getFreeHeap() > 6144 && ESP.getMaxAllocHeap() >= PG_SZ) {
+        uint8_t* p = (uint8_t*)malloc(PG_SZ);
+        if (!p) break;
+        pg[npg].d = p;
+        pg[npg].v = false;
+        pg[npg].acc = 0;
         npg++;
     }
+
+    Serial.printf("[EMU] Cache initialized: %d pages (%u KB, %d pooled, %d dynamic). Free heap: %u\n",
+                  npg, (npg * PG_SZ) / 1024, npg_pool, npg - npg_pool, ESP.getFreeHeap());
 
     if (npg < 4) {
         Serial.printf("[EMU] Failed to alloc minimum pages (npg=%d, free_heap=%u)\n", npg, ESP.getFreeHeap());
@@ -429,29 +504,6 @@ bool emu_init(uint8_t*, uint32_t) {
         return false;
     }
 
-    romf_pos = UINT32_MAX;
-    for (int i = 0; i < PG_LOCKED && i < npg; i++) {
-        uint32_t pb = i * PG_SZ;
-        if (pb < romlen) {
-            uint32_t sec = offset_to_disk_sector(pb);
-            bool ok = false;
-            if (sec != 0) {
-                ok = SD.readRAW(pg[i].d, sec);
-            }
-            if (!ok) {
-                romf.seek(pb);
-                size_t r = romf.read(pg[i].d, min((uint32_t)PG_SZ, romlen - pb));
-                if (r < PG_SZ) memset(pg[i].d + r, 0xFF, PG_SZ - r);
-            } else {
-                if (pb + PG_SZ > romlen) memset(pg[i].d + (romlen - pb), 0xFF, PG_SZ - (romlen - pb));
-            }
-            pg[i].addr = pb;
-            pg[i].acc = 0xFFFFFFFF;
-            pg[i].v = true;
-            uint16_t h = (pb >> PG_SHIFT) & HASH_M;
-            ht[h] = i;
-        }
-    }
     romf_pos = UINT32_MAX;
 
     enum gb_init_error_e r = gb_init(gb, gb_rom_read, gb_rom_read_16bit, gb_rom_read_32bit, gb_cram_r, gb_cram_w, gb_err, nullptr);
@@ -490,12 +542,20 @@ void emu_run_frame() {
     gb->direct.joypad_bits.right=!(jpad&0x01); gb->direct.joypad_bits.left=!(jpad&0x02);
     gb->direct.joypad_bits.up=!(jpad&0x04); gb->direct.joypad_bits.down=!(jpad&0x08);
 
+    static uint32_t s_frame_start = 0;
+    if (s_frame_start != 0 && (audio_get_volume() == AUDIO_VOL_MUTE || !audio_is_enabled())) {
+        while ((micros() - s_frame_start) < 16742) {
+            delayMicroseconds(100);
+        }
+    }
+    s_frame_start = micros();
+
     bool should_draw = (fskip == 0) || ((fcnt % (fskip + 1)) == 0);
     gb->direct.frame_skip = !should_draw;
     gb->display.frame_skip_count = should_draw ? 1 : 0;
 
     uint32_t t0 = micros();
-    gb_run_frame(gb);
+    gb_run_frame_dualfetch(gb);
     emu_time_us += (micros() - t0);
     audio_process_frame();
     fcnt++; fpsc++;
@@ -601,16 +661,16 @@ bool emu_load_state(const char* rom_path) {
         return false;
     }
 
-    if (memcmp(hdr.magic, "CYDGBC1", 8) != 0 || hdr.version != 1) {
-        Serial.println("[STATE] Magic or version mismatch");
+    bool valid_magic = (memcmp(hdr.magic, "CYDGBC1", 8) == 0 || memcmp(hdr.magic, "CYDGBS1", 8) == 0);
+    if (!valid_magic || hdr.version != 1) {
+        Serial.printf("[STATE] Magic or version mismatch: %.8s v%u\n", hdr.magic, (unsigned)hdr.version);
         f.close();
         return false;
     }
 
     if (hdr.struct_sz != sizeof(struct gb_s)) {
-        Serial.printf("[STATE] Struct size mismatch: %u != %u\n", hdr.struct_sz, (unsigned)sizeof(struct gb_s));
-        f.close();
-        return false;
+        Serial.printf("[STATE] Struct size diff: file=%u current=%u (loading min)\n",
+                      (unsigned)hdr.struct_sz, (unsigned)sizeof(struct gb_s));
     }
 
     uint8_t (*rom_r)(struct gb_s*, const uint_fast32_t) = gb->gb_rom_read;
@@ -625,10 +685,14 @@ bool emu_load_state(const char* rom_path) {
     void (*lcd_line_fn)(struct gb_s*, const uint8_t*, const uint_fast8_t) = gb->display.lcd_draw_line;
     void* priv = gb->direct.priv;
 
-    if (f.read((uint8_t*)gb, sizeof(struct gb_s)) != sizeof(struct gb_s)) {
+    size_t to_read = min((size_t)hdr.struct_sz, sizeof(struct gb_s));
+    if (f.read((uint8_t*)gb, to_read) != to_read) {
         Serial.println("[STATE] Failed reading struct gb_s");
         f.close();
         return false;
+    }
+    if (hdr.struct_sz > sizeof(struct gb_s)) {
+        f.seek(f.position() + (hdr.struct_sz - sizeof(struct gb_s)));
     }
 
     gb->gb_rom_read = rom_r;

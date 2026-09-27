@@ -78,7 +78,17 @@
 #define WALNUT_GB_16BIT_ALIGNED 1
 #define WALNUT_GB_32BIT_ALIGNED 1
 #define WALNUT_GB_RGB565_BIGENDIAN 0
-uint8_t __gb_read(struct gb_s *gb, uint16_t addr);
+
+#ifndef WGB_IRAM_ATTR
+# if defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_ESP32)
+#  include <esp_attr.h>
+#  define WGB_IRAM_ATTR IRAM_ATTR
+# else
+#  define WGB_IRAM_ATTR
+# endif
+#endif
+
+uint8_t WGB_IRAM_ATTR __gb_read(struct gb_s *gb, uint16_t addr);
 void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val);
 void __gb_write16(struct gb_s *gb, uint_fast16_t addr, uint16_t val);
 void __gb_write32(struct gb_s *gb, uint16_t addr, uint32_t val);
@@ -1503,7 +1513,7 @@ uint32_t __gb_read32(struct gb_s *gb, uint16_t addr)
  * Internal function used to read bytes.
  * addr is host platform endian.
  */
-uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
+uint8_t WGB_IRAM_ATTR __gb_read(struct gb_s *gb, uint16_t addr)
 {
 	switch(WALNUT_GB_GET_MSN16(addr))
 	{
@@ -3085,11 +3095,31 @@ void __gb_draw_line(struct gb_s *gb)
 		{
 			uint8_t s = sprites_to_render[sprite_number].sprite_number;
 #else
-		for (sprite_number = NUM_SPRITES - 1;
-			sprite_number != 0xFF;
-			sprite_number--)
+		uint8_t sprites_to_render[MAX_SPRITES_LINE];
+		uint8_t number_of_sprites = 0;
+		const uint8_t obj_size_y = (gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE) ? 0 : 8;
+
+		for(uint8_t s = 0; s < NUM_SPRITES; s++)
 		{
-			uint8_t s = sprite_number;
+			uint8_t OY = gb->oam[4 * s + 0];
+			if(hram_io_ly + obj_size_y >= OY || hram_io_ly + 16 < OY)
+				continue;
+
+			uint8_t OX = gb->oam[4 * s + 1];
+			if(OX == 0 || OX >= 168)
+				continue;
+
+			sprites_to_render[number_of_sprites++] = s;
+			if(number_of_sprites >= MAX_SPRITES_LINE)
+				break;
+		}
+
+		/* Render collected sprites in reverse priority order (max 10) */
+		for(sprite_number = number_of_sprites;
+				sprite_number > 0;
+				sprite_number--)
+		{
+			uint8_t s = sprites_to_render[sprite_number - 1];
 #endif
 			uint8_t py, t1, t2, dir, start, end, shift, disp_x;
 			/* Sprite Y position. */
@@ -3101,18 +3131,6 @@ void __gb_draw_line(struct gb_s *gb)
 				     & (gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE ? 0xFE : 0xFF);
 			/* Additional attributes. */
 			uint8_t OF = gb->oam[4 * s + 3];
-
-#if !WALNUT_GB_HIGH_LCD_ACCURACY
-			/* If sprite isn't on this line, continue. */
-			if(hram_io_ly +
-					(gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE ? 0 : 8) >= OY ||
-					hram_io_ly + 16 < OY)
-				continue;
-#endif
-
-			/* Continue if sprite not visible. */
-			if(OX == 0 || OX >= 168)
-				continue;
 
 			// y flip
 			py = hram_io_ly - OY + 16;
