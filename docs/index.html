@@ -1525,7 +1525,7 @@
 
         document.getElementById('romStatusDot').classList.add('connected');
         document.getElementById('romStatusText').textContent = 'Connecting...';
-        appendLog('romTerminal', 'Port opened. Searching for CYD-GB...', 'info');
+        appendLog('romTerminal', 'Port opened. Searching for CYDboy...', 'info');
 
         // Handshake retry loop (waits up to 8 seconds, handles reboot/splash screen delay)
         let connected = false;
@@ -1547,7 +1547,7 @@
         }
 
         if (!connected) {
-          throw new Error('No reply from CYD-GB. Make sure your CYD is on the launcher screen or select "USB ROM Manager" in Settings.');
+          throw new Error('No reply from CYDboy. Make sure your CYD is on the launcher screen or select "USB ROM Manager" in Settings.');
         }
 
         document.getElementById('romStatusText').textContent = 'Connected (115200)';
@@ -1556,7 +1556,7 @@
           <span>Disconnect USB</span>`;
         document.getElementById('btnRefreshRoms').disabled = false;
 
-        appendLog('romTerminal', 'CYD-GB connected successfully!', 'success');
+        appendLog('romTerminal', 'CYDboy connected successfully!', 'success');
 
         await loadStorageInfo();
         await loadRomList();

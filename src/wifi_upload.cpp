@@ -19,7 +19,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CYD-GB WiFi Upload</title>
+<title>CYDboy WiFi Upload</title>
 <style>
 body{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:20px;text-align:center}
 .card{background:#161b22;border:1px solid #30363d;border-radius:8px;max-width:500px;margin:20px auto;padding:24px}
@@ -33,7 +33,7 @@ p{color:#8b949e;font-size:14px;margin-bottom:20px}
 </head>
 <body>
 <div class="card">
-<h1>CYD-GB ROM Uploader</h1>
+<h1>CYDboy ROM Uploader</h1>
 <p>Drag and drop .gb or .gbc ROMs directly to the SD card</p>
 <div class="drop" onclick="document.getElementById('fileInput').click()">
 <h3>Select or Drop ROMs Here</h3>
@@ -80,7 +80,7 @@ static void draw_wifi_screen(const char* status = nullptr, int pct = -1) {
     tft.drawString("WiFi ROM Manager", 10, 18, 2);
     tft.setTextDatum(MR_DATUM);
     tft.setTextColor(0x7BEF, 0x18C3);
-    tft.drawString("CYD-GB", SCREEN_W - 10, 18, 1);
+    tft.drawString("CYDboy", SCREEN_W - 10, 18, 1);
 
     tft.fillRoundRect(12, 50, SCREEN_W - 24, 210, 6, 0x10A2);
     tft.drawRoundRect(12, 50, SCREEN_W - 24, 210, 6, 0x4A69);
@@ -90,7 +90,7 @@ static void draw_wifi_screen(const char* status = nullptr, int pct = -1) {
     tft.drawString("HOTSPOT ACTIVE", SCREEN_W / 2, 75, 2);
 
     tft.setTextColor(TFT_WHITE, 0x10A2);
-    tft.drawString("WiFi: CYD-GB-WiFi", SCREEN_W / 2, 105, 2);
+    tft.drawString("WiFi: CYDboy-WiFi", SCREEN_W / 2, 105, 2);
     tft.setTextColor(0xFFE0, 0x10A2);
     tft.drawString("http://192.168.4.1", SCREEN_W / 2, 130, 2);
 
@@ -152,7 +152,7 @@ static void handle_upload() {
 
 void wifi_upload_run() {
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("CYD-GB-WiFi");
+    WiFi.softAP("CYDboy-WiFi");
     delay(200);
 
     server.on("/", HTTP_GET, []() {

@@ -137,7 +137,7 @@ static void run_bt_scanner() {
 // ─── Setup ──────────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200); delay(200);
-    Serial.println("\n=== CYD-GB ===");
+    Serial.println("\n=== CYDboy ===");
     pinMode(LED_R_PIN, OUTPUT);
     if (LED_G_PIN >= 0) pinMode(LED_G_PIN, OUTPUT);
     if (LED_B_PIN >= 0) pinMode(LED_B_PIN, OUTPUT);

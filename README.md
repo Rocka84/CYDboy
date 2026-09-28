@@ -154,7 +154,7 @@ Pressing the **`\|\|`** button or the gamepad menu combo opens the in-game menu:
 ## ⚙️ Project Structure
 
 ```
-cyd-gb/
+CYDboy/
 ├── platformio.ini         # PlatformIO environment and library configuration
 ├── partitions.csv         # Custom flash partition table
 ├── include/

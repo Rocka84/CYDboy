@@ -1,8 +1,8 @@
 {
   "project": "CYDboy",
   "version": "v1.1",
-  "build_date": "2026-09-28 16:15",
-  "timestamp": "20260928_161529",
+  "build_date": "2026-09-28 22:09",
+  "timestamp": "20260928_220904",
   "size_bytes": 953168,
   "size_kb": 930.8,
   "board": "ESP32-2432S028R",

@@ -15,7 +15,7 @@ static void draw_usb_ui(const char* status, const char* filename = nullptr, int 
     tft.drawString("USB ROM Manager", 10, 18, 2);
     tft.setTextDatum(MR_DATUM);
     tft.setTextColor(0x7BEF, 0x18C3);
-    tft.drawString("CYD-GB", SCREEN_W - 10, 18, 1);
+    tft.drawString("CYDboy", SCREEN_W - 10, 18, 1);
 
     tft.fillRoundRect(12, 50, SCREEN_W - 24, 210, 6, 0x10A2);
     tft.drawRoundRect(12, 50, SCREEN_W - 24, 210, 6, 0x4A69);
@@ -250,7 +250,7 @@ bool serial_manager_check_handshake() {
 
 void serial_manager_run() {
     draw_usb_ui("Connected & Ready");
-    Serial.println("CYD:PONG:CYD-GB:v1.0");
+    Serial.println("CYD:PONG:CYDboy:v1.0");
 
     bool running = true;
     String cmd = "";
@@ -276,7 +276,7 @@ void serial_manager_run() {
             if (c == '\n') {
                 cmd.trim();
                 if (cmd.startsWith("CYD:PING") || cmd == "PING") {
-                    Serial.println("CYD:PONG:CYD-GB:v1.0");
+                    Serial.println("CYD:PONG:CYDboy:v1.0");
                     draw_usb_ui("Web Tool Connected");
                 } else if (cmd.startsWith("CYD:INFO") || cmd == "INFO") {
                     handle_info();
