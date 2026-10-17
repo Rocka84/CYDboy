@@ -2065,21 +2065,14 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			return;
 		}
 
-		/* DMG Palette Registers */
+		/* DMG registers update monochrome mapping only. Native CGB palette RAM
+		 * is independent and must only be changed via FF69 / FF6B. */
 		case 0x47:
 			gb->hram_io[IO_BGP] = val;
 			gb->display.bg_palette[0] = (gb->hram_io[IO_BGP] & 0x03);
 			gb->display.bg_palette[1] = (gb->hram_io[IO_BGP] >> 2) & 0x03;
 			gb->display.bg_palette[2] = (gb->hram_io[IO_BGP] >> 4) & 0x03;
 			gb->display.bg_palette[3] = (gb->hram_io[IO_BGP] >> 6) & 0x03;
-#if WALNUT_FULL_GBC_SUPPORT
-			if (gb->cgb.cgbMode) {
-				static const uint16_t dmg_colors[4] = { 0xFFFF, 0xAD55, 0x52AA, 0x0000 };
-				for (int p = 0; p < 4; p++) {
-					gb->cgb.fixPalette[p] = dmg_colors[gb->display.bg_palette[p]];
-				}
-			}
-#endif
 			return;
 
 		case 0x48:
@@ -2088,14 +2081,6 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			gb->display.sp_palette[1] = (gb->hram_io[IO_OBP0] >> 2) & 0x03;
 			gb->display.sp_palette[2] = (gb->hram_io[IO_OBP0] >> 4) & 0x03;
 			gb->display.sp_palette[3] = (gb->hram_io[IO_OBP0] >> 6) & 0x03;
-#if WALNUT_FULL_GBC_SUPPORT
-			if (gb->cgb.cgbMode) {
-				static const uint16_t dmg_colors[4] = { 0xFFFF, 0xAD55, 0x52AA, 0x0000 };
-				for (int p = 0; p < 4; p++) {
-					gb->cgb.fixPalette[0x20 + p] = dmg_colors[gb->display.sp_palette[p]];
-				}
-			}
-#endif
 			return;
 
 		case 0x49:
@@ -2104,14 +2089,6 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			gb->display.sp_palette[5] = (gb->hram_io[IO_OBP1] >> 2) & 0x03;
 			gb->display.sp_palette[6] = (gb->hram_io[IO_OBP1] >> 4) & 0x03;
 			gb->display.sp_palette[7] = (gb->hram_io[IO_OBP1] >> 6) & 0x03;
-#if WALNUT_FULL_GBC_SUPPORT
-			if (gb->cgb.cgbMode) {
-				static const uint16_t dmg_colors[4] = { 0xFFFF, 0xAD55, 0x52AA, 0x0000 };
-				for (int p = 0; p < 4; p++) {
-					gb->cgb.fixPalette[0x24 + p] = dmg_colors[gb->display.sp_palette[4 + p]];
-				}
-			}
-#endif
 			return;
 
 		/* Window Position Registers */
